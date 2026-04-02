@@ -84,10 +84,7 @@ def save_session(cwd: str, messages: list[dict[str, Any]]) -> None:
     file_path = get_session_file_path(cwd)
 
     # Filter: remove system messages unless they have _summary
-    to_save = [
-        msg for msg in messages
-        if msg.get("role") != "system" or msg.get("_summary")
-    ]
+    to_save = [msg for msg in messages if msg.get("role") != "system" or msg.get("_summary")]
 
     file_path.write_text(json.dumps(to_save, indent=2, ensure_ascii=False), encoding="utf-8")
 
@@ -109,7 +106,7 @@ def clear_session(cwd: str) -> str | None:
 
     # Create archive filename with timestamp
     timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-    archive_path = file_path.with_suffix(f"-archive-{timestamp}.json")
+    archive_path = file_path.with_name(f"{file_path.stem}-archive-{timestamp}.json")
 
     # Rename to archive
     file_path.rename(archive_path)
