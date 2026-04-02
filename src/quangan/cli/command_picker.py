@@ -7,7 +7,7 @@ Provides an interactive TUI menu for selecting commands.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable
 
 from prompt_toolkit import Application
 from prompt_toolkit.key_binding import KeyBindings
@@ -47,7 +47,7 @@ PICKER_STYLE = Style.from_dict(
 )
 
 
-def start_command_picker(on_done: Callable[[str | None], None]) -> None:
+async def start_command_picker(on_done: Callable[[str | None], Any]) -> None:
     """
     Start an interactive command picker.
 
@@ -101,4 +101,4 @@ def start_command_picker(on_done: Callable[[str | None], None]) -> None:
         on_done(None)
 
     app = Application(layout=layout, key_bindings=kb, style=PICKER_STYLE, full_screen=False)
-    app.run()
+    await app.run_async()

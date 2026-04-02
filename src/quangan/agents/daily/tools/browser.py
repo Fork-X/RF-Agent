@@ -100,7 +100,7 @@ async def _ensure_context() -> tuple[Any, Any]:
     """
     global _mode, _cdp_browser, _cdp_context, _persistent_ctx, _page
 
-    from playwright.async_api import async_playwright
+    from playwright.async_api import async_playwright, Error as PlaywrightError
 
     # Try CDP first
     if _mode == "unknown":
@@ -125,10 +125,17 @@ async def _ensure_context() -> tuple[Any, Any]:
     if _mode == "persistent" and _persistent_ctx is None:
         pw = await async_playwright().start()
         PROFILE_DIR.mkdir(parents=True, exist_ok=True)
-        _persistent_ctx = await pw.chromium.launch_persistent_context(
-            str(PROFILE_DIR),
-            headless=False,
-        )
+        try:
+            _persistent_ctx = await pw.chromium.launch_persistent_context(
+                str(PROFILE_DIR),
+                headless=False,
+            )
+        except PlaywrightError as e:
+            if "Executable doesn't exist" in str(e):
+                raise RuntimeError(
+                    "Chromium 浏览器未安装。请在终端运行：uv run playwright install chromium"
+                ) from e
+            raise
         _page = _persistent_ctx.pages[0] if _persistent_ctx.pages else await _persistent_ctx.new_page()
 
     if _mode == "cdp":

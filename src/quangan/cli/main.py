@@ -46,7 +46,8 @@ from quangan.tools.types import ToolDefinition, make_tool_definition
 # Environment file path
 # ─────────────────────────────────────────────────────────────────────────────
 
-ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+ENV_FILE = PROJECT_ROOT / ".env"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -123,7 +124,8 @@ async def update_life_memory_async() -> None:
     try:
         # Get recent non-archived messages
         history = [
-            msg for msg in agent.get_history()
+            msg
+            for msg in agent.get_history()
             if not msg.get("_archived") and msg.get("role") != "system"
         ]
 
@@ -239,7 +241,7 @@ def switch_provider(name: str) -> None:
     display.print_system(f"✅ 已切换至 {name}{proto_label} | 模型：{new_model}")
 
 
-def show_provider_picker(session: PromptSession) -> None:
+async def show_provider_picker(session: PromptSession) -> None:
     """Show interactive provider picker."""
     # Build provider list
     provider_items = []
@@ -247,13 +249,15 @@ def show_provider_picker(session: PromptSession) -> None:
     for name, preset in PROVIDERS.items():
         prefix = name.replace("-", "_").upper()
         api_key = os.environ.get(f"{prefix}_API_KEY", "")
-        provider_items.append({
-            "name": name,
-            "model": os.environ.get(f"{prefix}_MODEL") or preset.default_model,
-            "active": name == config.provider,
-            "configured": is_valid_api_key(api_key),
-            "preset": preset,
-        })
+        provider_items.append(
+            {
+                "name": name,
+                "model": os.environ.get(f"{prefix}_MODEL") or preset.default_model,
+                "active": name == config.provider,
+                "configured": is_valid_api_key(api_key),
+                "preset": preset,
+            }
+        )
 
     selected = 0
 
@@ -319,7 +323,7 @@ def show_provider_picker(session: PromptSession) -> None:
     from prompt_toolkit.layout import Window
 
     app = Application(layout=Layout(Window(control)), key_bindings=kb)
-    app.run()
+    await app.run_async()
 
     # Clear the menu
     console.print("\033[{}A\033[J".format(len(provider_items) + 2), end="")
@@ -354,7 +358,7 @@ def show_provider_picker(session: PromptSession) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def handle_command(cmd: str, session: PromptSession) -> bool:
+async def handle_command(cmd: str, session: PromptSession) -> bool:
     """Handle a slash command. Returns True if handled."""
     global is_plan_mode
 
@@ -382,9 +386,7 @@ def handle_command(cmd: str, session: PromptSession) -> bool:
         from quangan.agents.coding.tools import ALL_CODING_TOOLS
         from quangan.agents.daily.tools import ALL_DAILY_TOOLS
 
-        tool_names = [
-            f"  [coding] {t[0]['function']['name']}" for t in ALL_CODING_TOOLS
-        ] + [
+        tool_names = [f"  [coding] {t[0]['function']['name']}" for t in ALL_CODING_TOOLS] + [
             f"  [daily]  {t[0]['function']['name']}" for t in ALL_DAILY_TOOLS
         ]
         display.print_tool_list(tool_names)
@@ -416,17 +418,18 @@ def handle_command(cmd: str, session: PromptSession) -> bool:
         return True
 
     if cmd == "/provider":
-        show_provider_picker(session)
+        await show_provider_picker(session)
         return True
 
     if cmd in ("/exit", "/quit"):
         display.print_divider()
         display.print_system("再见！👋")
         import sys
+
         sys.exit(0)
 
     if cmd.startswith("/provider "):
-        switch_provider(cmd[len("/provider "):].strip())
+        switch_provider(cmd[len("/provider ") :].strip())
         return True
 
     display.print_error(f"未知命令: {cmd}，输入 /help 查看命令列表")
@@ -511,8 +514,7 @@ async def async_main() -> None:
     memory_context = ""
     if init_core_memory.memories:
         memory_context = "\n\n## 你的核心记忆\n" + "\n".join(
-            f"- [强度:{m.reinforce_count}] {m.content}"
-            for m in init_core_memory.memories
+            f"- [强度:{m.reinforce_count}] {m.content}" for m in init_core_memory.memories
         )
 
     # Create main agent "小枫"
@@ -550,8 +552,14 @@ async def async_main() -> None:
         "on_tool_result": lambda name, result: display.print_tool_result(result),
     }
 
-    # Initialize skill loader
-    skill_loader = SkillLoader()
+    # Initialize skill loader with absolute paths
+    skill_loader = SkillLoader(
+        [
+            str(PROJECT_ROOT / ".qoder" / "skills"),
+            str(PROJECT_ROOT / "skills"),
+            # "~/.claude/skills",
+        ]
+    )
 
     agent_config = AgentConfig(
         client=client,
@@ -580,10 +588,14 @@ async def async_main() -> None:
 
     # Register sub-agent tools
     async def coding_agent_handler(args: dict[str, Any]) -> str:
-        coding_agent = create_coding_agent(client, CWD, {
-            **sub_agent_callbacks,
-            "confirm": make_confirm_fn(session),
-        })
+        coding_agent = create_coding_agent(
+            client,
+            CWD,
+            {
+                **sub_agent_callbacks,
+                "confirm": make_confirm_fn(session),
+            },
+        )
         return await coding_agent.run(args["task"])
 
     async def daily_agent_handler(args: dict[str, Any]) -> str:
@@ -657,9 +669,14 @@ async def async_main() -> None:
             if text.startswith("/"):
                 # Handle command picker for just "/"
                 if text == "/":
-                    start_command_picker(lambda cmd: None)
+
+                    async def on_picker_done(cmd: str | None) -> None:
+                        if cmd:
+                            await handle_command(cmd, session)
+
+                    await start_command_picker(on_picker_done)
                     continue
-                handle_command(text, session)
+                await handle_command(text, session)
                 continue
 
             # Print user message
