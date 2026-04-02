@@ -41,12 +41,12 @@ mpv --version
 **macOS / Windows**：若未安装，直接执行安装脚本：
 
 ```bash
-python3 scripts/install_mpv.py
+python3 src/quangan/tools/system/install_mpv.py
 ```
 
 **Linux**：询问用户是否需要播放功能：
 
-- 如果是桌面环境、需要本地播放 → 执行 `python3 scripts/install_mpv.py`
+- 如果是桌面环境、需要本地播放 → 执行 `python3 src/quangan/tools/system/install_mpv.py`
 - 如果是服务器环境、不需要播放 → 跳过，搜索/歌单等命令仍可正常使用
 
 安装脚本会自动识别包管理器：
@@ -94,7 +94,7 @@ ncm-cli login --background
 | 问题                           | 解决方法                                                       |
 |------------------------------|------------------------------------------------------------|
 | `ncm-cli: command not found` | 检查 npm 全局 bin 是否在 PATH 中：`npm bin -g`                      |
-| `mpv not found`              | 重新运行 `python3 scripts/install_mpv.py` 或手动安装：https://mpv.io |
+| `mpv not found`              | 重新运行 `python3 src/quangan/tools/system/install_mpv.py` 或手动安装：https://mpv.io |
 | 登录超时                         | 重新执行 `ncm-cli login --background`                          |
 
 ## 基本信息
