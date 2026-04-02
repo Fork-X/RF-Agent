@@ -45,10 +45,10 @@ class SkillLoader:
         Recursively find all skill files in the skills directory.
 
         Yields:
-            Path objects for .md files found in skills_dir
+            Path objects for SKILL.md files found in skills_dir
         """
         if self.skills_dir.exists():
-            yield from self.skills_dir.rglob("*.md")
+            yield from self.skills_dir.rglob("SKILL.md")
 
     def load_all(self, force_reload: bool = False) -> dict[str, Skill]:
         """

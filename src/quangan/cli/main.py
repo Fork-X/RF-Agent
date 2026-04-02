@@ -555,7 +555,7 @@ async def async_main() -> None:
     }
 
     # Initialize skill loader with absolute paths
-    skill_loader = SkillLoader(PROJECT_ROOT / ".skills")
+    skill_loader = SkillLoader(PROJECT_ROOT / "src" / "quangan" / "skills")
 
     agent_config = AgentConfig(
         client=client,
@@ -639,11 +639,6 @@ async def async_main() -> None:
     def escape(event: Any) -> None:
         if is_agent_running:
             agent.abort()
-
-    @kb.add("/")
-    def slash(event: Any) -> None:
-        # Let the character be typed first
-        pass
 
     # Main loop
     while True:

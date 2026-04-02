@@ -62,11 +62,17 @@ def create_coding_agent(
 
     agent = Agent(config)
 
-    # Register coding tools
-    from .tools import create_all_coding_tools
+    # Register coding tools from new tools package
+    from quangan.tools import create_filesystem_tools, create_code_tools, create_command_tools
 
     confirm_fn = callbacks.get("confirm") if callbacks else None
-    tools = create_all_coding_tools(work_dir, confirm_fn)
+
+    # Combine all tools needed for coding
+    tools = [
+        *create_filesystem_tools(),
+        *create_code_tools(),
+        *create_command_tools(work_dir, confirm_fn),
+    ]
 
     for definition, implementation, readonly in tools:
         agent.register_tool(definition, implementation, readonly)

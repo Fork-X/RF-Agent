@@ -70,10 +70,15 @@ browser_action 支持以下操作：
 
     agent = Agent(config)
 
-    # Register daily tools
-    from .tools import create_all_daily_tools
+    # Register daily tools from new tools package
+    from quangan.tools import create_system_tools, create_browser_tools, create_shell_tools
 
-    tools = create_all_daily_tools()
+    # Combine all tools needed for daily tasks
+    tools = [
+        *create_system_tools(),
+        *create_browser_tools(),
+        *create_shell_tools(),
+    ]
 
     for definition, implementation, readonly in tools:
         agent.register_tool(definition, implementation, readonly)
