@@ -385,11 +385,18 @@ async def handle_command(cmd: str, session: PromptSession) -> bool:
         return True
 
     if cmd == "/tools":
-        from quangan.agents.coding.tools import ALL_CODING_TOOLS
-        from quangan.agents.daily.tools import ALL_DAILY_TOOLS
+        from quangan.tools.filesystem import create_filesystem_tools
+        from quangan.tools.code import create_code_tools
+        from quangan.tools.command import create_command_tools, create_shell_tools
+        from quangan.tools.system import create_system_tools
+        from quangan.tools.browser import create_browser_tools
 
-        tool_names = [f"  [coding] {t[0]['function']['name']}" for t in ALL_CODING_TOOLS] + [
-            f"  [daily]  {t[0]['function']['name']}" for t in ALL_DAILY_TOOLS
+        # Collect all tools
+        coding_tools = create_filesystem_tools() + create_code_tools() + create_command_tools("", None)
+        daily_tools = create_system_tools() + create_browser_tools() + create_shell_tools()
+
+        tool_names = [f"  [coding] {t[0]['function']['name']}" for t in coding_tools] + [
+            f"  [daily]  {t[0]['function']['name']}" for t in daily_tools
         ]
         display.print_tool_list(tool_names)
         return True
