@@ -14,20 +14,17 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
-from quangan.config.llm_config import LLMConfig
 from quangan.llm.types import (
     AgentCallRequest,
-    AgentCallResponse,
-    ChatMessage,
     ILLMClient,
     TokenUsage,
 )
 from quangan.skills import Skill, SkillLoader
 from quangan.tools.types import ToolCall, ToolDefinition, ToolRegistryEntry, ToolResult
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Exceptions
@@ -270,6 +267,12 @@ class Agent:
         for skill in self._skills.values():
             if skill.should_trigger(message) and skill not in self._active_skills:
                 triggered.append(skill)
+
+        # 按 priority 降序，同优先级按触发匹配数排序
+        triggered.sort(
+            key=lambda s: (s.metadata.priority, s.get_trigger_score(message)),
+            reverse=True
+        )
         return triggered
 
     def list_skills(self) -> list[Skill]:
@@ -400,10 +403,17 @@ class Agent:
         try:
             summary = await self._client.chat(
                 [
-                    {"role": "system", "content": "你是一个对话摘要助手，擅长从编程对话中提炼关键信息。"},
+                    {
+                        "role": "system",
+                        "content": "你是一个对话摘要助手，擅长从编程对话中提炼关键信息。",
+                    },
                     {
                         "role": "user",
-                        "content": f"请将以下对话历史压缩成简洁摘要（200字以内），重点保留：已读过的文件路径、做过的代码修改、重要结论。\n\n{summary_prompt}",
+                        "content": (
+                            "请将以下对话历史压缩成简洁摘要（200字以内），"
+                            "重点保留：已读过的文件路径、做过的代码修改、重要结论。"
+                            f"\n\n{summary_prompt}"
+                        ),
                     },
                 ]
             )
@@ -495,7 +505,7 @@ class Agent:
 
             if self._verbose:
                 print(f"\n🔧 调用工具: {tool_name}")
-                print(f"📥 参数:", args)
+                print("📥 参数:", args)
 
             if self._on_tool_call:
                 self._on_tool_call(tool_name, args)
@@ -506,7 +516,7 @@ class Agent:
                 result = await result
 
             if self._verbose:
-                print(f"📤 结果:", result[:200] if isinstance(result, str) else result)
+                print("📤 结果:", result[:200] if isinstance(result, str) else result)
 
             if self._on_tool_result:
                 self._on_tool_result(tool_name, str(result))
@@ -612,7 +622,7 @@ class Agent:
             except asyncio.CancelledError:
                 if self._aborted:
                     self._aborted = False
-                    raise AgentInterruptedError()
+                    raise AgentInterruptedError() from None
                 raise
             except AgentInterruptedError:
                 raise

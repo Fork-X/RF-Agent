@@ -11,17 +11,14 @@ This is the main orchestrator that:
 from __future__ import annotations
 
 import asyncio
-import functools
-import inspect
-import json
 import os
 import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.shortcuts import confirm
 
 from quangan.agent.agent import Agent, AgentConfig, AgentInterruptedError
 from quangan.agents.coding import create_coding_agent
@@ -31,8 +28,8 @@ from quangan.cli.command_picker import start_command_picker
 from quangan.cli.display import console
 from quangan.cli.session_store import clear_session, load_session, save_session
 from quangan.config.llm_config import (
-    LLMConfig,
     PROVIDERS,
+    LLMConfig,
     get_model_context_limit,
     load_config_from_env,
 )
@@ -40,7 +37,6 @@ from quangan.llm.client import create_llm_client
 from quangan.memory import MEMORY_BASE_DIR, create_memory_tools, get_core_memory
 from quangan.skills import SkillLoader
 from quangan.tools.types import ToolDefinition, make_tool_definition
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Environment file path
@@ -72,7 +68,10 @@ _life_memory_update_count = 0
 
 coding_agent_def: ToolDefinition = make_tool_definition(
     name="coding_agent",
-    description="调用 Coding Agent 完成代码相关任务，例如：阅读/修改/创建代码文件、执行命令、搜索代码、调试程序等",
+    description=(
+        "调用 Coding Agent 完成代码相关任务，"
+        "例如：阅读/修改/创建代码文件、执行命令、搜索代码、调试程序等"
+    ),
     parameters={
         "task": {
             "type": "string",
@@ -84,7 +83,10 @@ coding_agent_def: ToolDefinition = make_tool_definition(
 
 daily_agent_def: ToolDefinition = make_tool_definition(
     name="daily_agent",
-    description="调用 Daily Agent 完成日常任务，例如：打开应用、打开网址/搜索、执行系统命令、回答知识性问题等",
+    description=(
+        "调用 Daily Agent 完成日常任务，"
+        "例如：打开应用、打开网址/搜索、执行系统命令、回答知识性问题等"
+    ),
     parameters={
         "task": {
             "type": "string",
@@ -289,14 +291,14 @@ async def show_provider_picker(session: PromptSession) -> None:
     def up(event: Any) -> None:
         nonlocal selected
         selected = (selected - 1) % len(provider_items)
-        console.print("\033[{}A\033[J".format(len(provider_items) + 1))
+        console.print(f"\033[{len(provider_items) + 1}A\033[J")
         render()
 
     @kb.add("down")
     def down(event: Any) -> None:
         nonlocal selected
         selected = (selected + 1) % len(provider_items)
-        console.print("\033[{}A\033[J".format(len(provider_items) + 1))
+        console.print(f"\033[{len(provider_items) + 1}A\033[J")
         render()
 
     @kb.add("enter")
@@ -314,9 +316,9 @@ async def show_provider_picker(session: PromptSession) -> None:
 
     # Create a simple app for key handling
     from prompt_toolkit.application import Application
+    from prompt_toolkit.buffer import Buffer
     from prompt_toolkit.layout import Layout
     from prompt_toolkit.layout.controls import BufferControl
-    from prompt_toolkit.buffer import Buffer
 
     buffer = Buffer()
     control = BufferControl(buffer=buffer)
@@ -326,7 +328,7 @@ async def show_provider_picker(session: PromptSession) -> None:
     await app.run_async()
 
     # Clear the menu
-    console.print("\033[{}A\033[J".format(len(provider_items) + 2), end="")
+    console.print(f"\033[{len(provider_items) + 2}A\033[J", end="")
 
     if result_name:
         p = provider_items[selected]
@@ -553,13 +555,7 @@ async def async_main() -> None:
     }
 
     # Initialize skill loader with absolute paths
-    skill_loader = SkillLoader(
-        [
-            str(PROJECT_ROOT / ".qoder" / "skills"),
-            str(PROJECT_ROOT / "skills"),
-            # "~/.claude/skills",
-        ]
-    )
+    skill_loader = SkillLoader(PROJECT_ROOT / ".skills")
 
     agent_config = AgentConfig(
         client=client,
@@ -568,9 +564,9 @@ async def async_main() -> None:
         skill_loader=skill_loader,
         enable_skill_triggers=True,
         on_tool_call=lambda name, args: (
-            display.print_tool_call(f"💻 Coding Agent ← 路由到", {"task": args.get("task")})
+            display.print_tool_call("💻 Coding Agent ← 路由到", {"task": args.get("task")})
             if name == "coding_agent"
-            else display.print_tool_call(f"🌟 Daily Agent ← 路由到", {"task": args.get("task")})
+            else display.print_tool_call("🌟 Daily Agent ← 路由到", {"task": args.get("task")})
             if name == "daily_agent"
             else display.print_tool_call(name, args)
         ),

@@ -7,6 +7,6 @@ allowing users to extend agent capabilities through declarative Markdown files.
 
 from .loader import SkillLoader
 from .models import Skill, SkillMetadata
-from .parser import SkillParser
+from .parser import SkillParseError, SkillParser
 
-__all__ = ["Skill", "SkillMetadata", "SkillParser", "SkillLoader"]
+__all__ = ["Skill", "SkillMetadata", "SkillParser", "SkillParseError", "SkillLoader"]
