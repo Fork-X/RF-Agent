@@ -6,15 +6,18 @@ Creates a stateless Daily Agent instance for daily tasks.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from quangan.agent.agent import Agent, AgentConfig
 from quangan.llm.types import ILLMClient
+from quangan.skills import SkillLoader
 
 
 def create_daily_agent(
     client: ILLMClient,
     callbacks: dict[str, Callable] | None = None,
+    skill_loader: SkillLoader | None = None,
+    skill_tags: list[str] | None = None,
 ) -> Agent:
     """
     Create a Daily Agent for daily tasks.
@@ -26,6 +29,8 @@ def create_daily_agent(
         callbacks: Optional callbacks:
             - on_tool_call: Called when a tool is invoked
             - on_tool_result: Called when a tool returns
+        skill_loader: Optional skill loader for loading skills by tags
+        skill_tags: Optional list of skill tags to enable for this agent
 
     Returns:
         Configured Agent instance with daily tools registered
@@ -44,41 +49,7 @@ def create_daily_agent(
 
 ## 🎵 音乐需求：优先使用网易云 ncm-cli
 
-用户有任何音乐相关需求（播放/搜索/控制播放/歌单推荐等），**第一选择是通过 run_shell 调用 ncm-cli**。
-
-### 执行前检查链（按顺序）
-1. \`ncm-cli --version\` — 未安装则引导用户安装（npm install -g @music163/ncm-cli）
-2. \`ncm-cli login --check\` — 未登录则执行 \`ncm-cli login --background\`
-3. 直接按下方命令格式执行，**不要先跑 ncm-cli commands 探路**，格式已知见下
-
-### 常用命令（直接使用，无需探索）
-
-\`\`\`bash
-# 搜索歌曲（必须用 --keyword，不能用位置参数）
-ncm-cli search song --keyword "歌名" --userInput "搜索xxx"
-
-# 播放单曲（需要搜索结果中的 id 和 originalId）
-ncm-cli play --song --encrypted-id <32位hex> --original-id <数字>
-
-# 播放歌单
-ncm-cli play --playlist --encrypted-id <歌单id> --original-id <歌单id>
-
-# 播放控制
-ncm-cli pause
-ncm-cli resume
-ncm-cli next
-ncm-cli prev
-
-# 搜索歌单
-ncm-cli search playlist --keyword "关键词" --userInput "搜索xxx"
-\`\`\`
-
-### 搜索 → 播放标准流程
-1. \`ncm-cli search song --keyword "歌名" --userInput "播放xxx"\` — 获取 id 和 originalId
-2. 取结果第一条（visible=true 的），用 \`ncm-cli play --song --encrypted-id <id> --original-id <originalId>\` 播放
-3. **visible=false 的歌曲不可播放，跳过**
-
-**只有在 ncm-cli 确实不可用时**，才考虑其他方式（URL Scheme、browser_action、AppleScript）。
+用户有任何音乐相关需求（播放/搜索/控制播放/歌单推荐等），**第一选择是激活 netease-music-assistant 的skill，并按指引进行操作**。
 
 ## 浏览器使用
 browser_action 支持以下操作：
@@ -98,16 +69,23 @@ browser_action 支持以下操作：
         max_iterations=20,
         on_tool_call=callbacks.get("on_tool_call") if callbacks else None,
         on_tool_result=callbacks.get("on_tool_result") if callbacks else None,
+        skill_loader=skill_loader,
+        skill_tags=skill_tags or [],
+        enable_skill_triggers=True,
+        enable_skill_tool=True,
     )
 
     agent = Agent(config)
 
     # Register daily tools from new tools package
-    from quangan.tools import create_system_tools, create_browser_tools, create_shell_tools
+    from quangan.tools import create_browser_tools, create_shell_tools
+    from quangan.tools.system import open_app, open_url
 
     # Combine all tools needed for daily tasks
+    # Note: 不注册 run_applescript，音乐相关任务必须通过 skill 系统处理
     tools = [
-        *create_system_tools(),
+        (open_app.definition, open_app.implementation, False),
+        (open_url.definition, open_url.implementation, False),
         *create_browser_tools(),
         *create_shell_tools(),
     ]

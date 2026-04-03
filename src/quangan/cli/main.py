@@ -75,7 +75,7 @@ coding_agent_def: ToolDefinition = make_tool_definition(
     parameters={
         "task": {
             "type": "string",
-            "description": "要完成的代码任务，请尽量详细描述需求和背景",
+            "description": "用户的原始代码需求，保留用户原话和背景，不要自行规划实现步骤",
         },
     },
     required=["task"],
@@ -90,7 +90,7 @@ daily_agent_def: ToolDefinition = make_tool_definition(
     parameters={
         "task": {
             "type": "string",
-            "description": "要完成的日常任务，请尽量详细描述需求",
+            "description": "用户的原始需求，保留用户原话，不要自行规划实现方式",
         },
     },
     required=["task"],
@@ -385,15 +385,23 @@ async def handle_command(cmd: str, session: PromptSession) -> bool:
         return True
 
     if cmd == "/tools":
-        from quangan.tools.filesystem import create_filesystem_tools
+        from quangan.tools.browser import create_browser_tools
         from quangan.tools.code import create_code_tools
         from quangan.tools.command import create_command_tools, create_shell_tools
+        from quangan.tools.filesystem import create_filesystem_tools
         from quangan.tools.system import create_system_tools
-        from quangan.tools.browser import create_browser_tools
 
         # Collect all tools
-        coding_tools = create_filesystem_tools() + create_code_tools() + create_command_tools("", None)
-        daily_tools = create_system_tools() + create_browser_tools() + create_shell_tools()
+        coding_tools = (
+            create_filesystem_tools()
+            + create_code_tools()
+            + create_command_tools("", None)
+        )
+        daily_tools = (
+            create_system_tools()
+            + create_browser_tools()
+            + create_shell_tools()
+        )
 
         tool_names = [f"  [coding] {t[0]['function']['name']}" for t in coding_tools] + [
             f"  [daily]  {t[0]['function']['name']}" for t in daily_tools
@@ -543,8 +551,8 @@ async def async_main() -> None:
 - coding_agent：处理代码相关任务（读写文件、执行命令、代码搜索等）
 - daily_agent：处理日常任务（播放音乐、打开应用、网页搜索、系统命令、知识问答等）
 
-根据芮枫的需求分析任务类型并调用合适的助手完成。
-如果是简单的聊天或问候，直接回答就好，无需调助手。
+调用助手时，直接传递用户的原始需求，不要自行规划实现步骤或指定技术方案。
+助手内部有专业的 Skill 指引，会自行决定最佳执行方式
 
 当前工作目录: {CWD}
 
@@ -567,8 +575,9 @@ async def async_main() -> None:
     agent_config = AgentConfig(
         client=client,
         system_prompt=system_prompt,
-        max_iterations=50,
+        max_iterations=20,
         skill_loader=skill_loader,
+        skill_tags=["router"],
         enable_skill_triggers=True,
         on_tool_call=lambda name, args: (
             display.print_tool_call("💻 Coding Agent ← 路由到", {"task": args.get("task")})
@@ -598,11 +607,18 @@ async def async_main() -> None:
                 **sub_agent_callbacks,
                 "confirm": make_confirm_fn(session),
             },
+            skill_loader=skill_loader,
+            skill_tags=["coding"],
         )
         return await coding_agent.run(args["task"])
 
     async def daily_agent_handler(args: dict[str, Any]) -> str:
-        daily_agent = create_daily_agent(client, sub_agent_callbacks)
+        daily_agent = create_daily_agent(
+            client,
+            sub_agent_callbacks,
+            skill_loader=skill_loader,
+            skill_tags=["daily"],
+        )
         return await daily_agent.run(args["task"])
 
     agent.register_tool(coding_agent_def, coding_agent_handler)

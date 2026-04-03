@@ -3,9 +3,10 @@ name: git-helper
 description: Git 操作助手。帮助用户执行 Git 命令、解决冲突、理解分支状态、提交规范等。当用户提到 git、提交、分支、合并、冲突等关键词时激活。
 version: 1.0.0
 tags:
+  - router
+  - coding
   - git
   - version-control
-  - daily
 triggers:
   - git
   - 提交

@@ -6,17 +6,19 @@ Creates a stateless Coding Agent instance for code-related tasks.
 
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable
+from collections.abc import Callable
 
 from quangan.agent.agent import Agent, AgentConfig
 from quangan.llm.types import ILLMClient
-from quangan.tools.types import ToolDefinition
+from quangan.skills import SkillLoader
 
 
 def create_coding_agent(
     client: ILLMClient,
     work_dir: str,
     callbacks: dict[str, Callable] | None = None,
+    skill_loader: SkillLoader | None = None,
+    skill_tags: list[str] | None = None,
 ) -> Agent:
     """
     Create a Coding Agent for code-related tasks.
@@ -30,6 +32,8 @@ def create_coding_agent(
             - on_tool_call: Called when a tool is invoked
             - on_tool_result: Called when a tool returns
             - confirm: Async callback for y/N confirmation (for execute_command safety)
+        skill_loader: Optional skill loader for loading skills by tags
+        skill_tags: Optional list of skill tags to enable for this agent
 
     Returns:
         Configured Agent instance with coding tools registered
@@ -58,12 +62,20 @@ def create_coding_agent(
         max_iterations=30,
         on_tool_call=callbacks.get("on_tool_call") if callbacks else None,
         on_tool_result=callbacks.get("on_tool_result") if callbacks else None,
+        skill_loader=skill_loader,
+        skill_tags=skill_tags or [],
+        enable_skill_triggers=True,
+        enable_skill_tool=True,
     )
 
     agent = Agent(config)
 
     # Register coding tools from new tools package
-    from quangan.tools import create_filesystem_tools, create_code_tools, create_command_tools
+    from quangan.tools import (
+        create_code_tools,
+        create_command_tools,
+        create_filesystem_tools,
+    )
 
     confirm_fn = callbacks.get("confirm") if callbacks else None
 
