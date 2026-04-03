@@ -3,6 +3,8 @@ name: python-code-review
 description: Python 代码审查助手。当用户请求代码审查、代码优化建议、代码质量检查或 Python 最佳实践指导时使用此 skill。
 version: 1.0.0
 tags:
+  - router
+  - coding
   - python
   - code-review
   - best-practices

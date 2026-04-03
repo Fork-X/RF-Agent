@@ -68,6 +68,8 @@ class AgentConfig:
         skills: List of skills to enable (optional)
         skill_loader: SkillLoader for dynamic skill discovery (optional)
         enable_skill_triggers: Whether to auto-activate skills based on triggers (default: True)
+        skill_tags: Tags to filter skills when loading from skill_loader (default: empty list)
+        enable_skill_tool: Whether to register activate_skill tool for LLM (default: False)
     """
 
     client: ILLMClient
@@ -82,6 +84,8 @@ class AgentConfig:
     skills: list[Skill] = field(default_factory=list)
     skill_loader: SkillLoader | None = None
     enable_skill_triggers: bool = True
+    skill_tags: list[str] = field(default_factory=list)
+    enable_skill_tool: bool = True
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -143,12 +147,21 @@ class Agent:
         if self._skill_loader:
             loaded_skills = self._skill_loader.load_all()
             for name, skill in loaded_skills.items():
+                # Filter by tags if skill_tags specified
+                if config.skill_tags and not any(
+                    tag in skill.metadata.tags for tag in config.skill_tags
+                ):
+                    continue
                 if name not in self._skills:
                     self._skills[name] = skill
 
         # Add system prompt if provided
         if config.system_prompt:
             self._messages.append({"role": "system", "content": config.system_prompt})
+
+        # Register activate_skill tool if enabled
+        if config.enable_skill_tool and self._skills:
+            self._register_skill_tools()
 
     # ─────────────────────────────────────────────────────────────────────────
     # Tool Registration
@@ -235,6 +248,21 @@ class Agent:
                     print(f"✓ 已停用 Skill: {skill_name}")
                 return True
         return False
+
+    def _register_skill_tools(self) -> None:
+        """Register activate_skill tool for LLM to activate skills on demand."""
+        from quangan.tools.system.activate_skill import (
+            create_implementation as create_activate_skill_impl,
+        )
+        from quangan.tools.system.activate_skill import (
+            definition as activate_skill_def,
+        )
+
+        self.register_tool(
+            activate_skill_def,
+            create_activate_skill_impl(self),
+            readonly=True,
+        )
 
     def _inject_skill_prompt(self, skill: Skill) -> None:
         """

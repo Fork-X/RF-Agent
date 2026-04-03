@@ -6,15 +6,18 @@ Creates a stateless Daily Agent instance for daily tasks.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from quangan.agent.agent import Agent, AgentConfig
 from quangan.llm.types import ILLMClient
+from quangan.skills import SkillLoader
 
 
 def create_daily_agent(
     client: ILLMClient,
     callbacks: dict[str, Callable] | None = None,
+    skill_loader: SkillLoader | None = None,
+    skill_tags: list[str] | None = None,
 ) -> Agent:
     """
     Create a Daily Agent for daily tasks.
@@ -26,6 +29,8 @@ def create_daily_agent(
         callbacks: Optional callbacks:
             - on_tool_call: Called when a tool is invoked
             - on_tool_result: Called when a tool returns
+        skill_loader: Optional skill loader for loading skills by tags
+        skill_tags: Optional list of skill tags to enable for this agent
 
     Returns:
         Configured Agent instance with daily tools registered
@@ -33,20 +38,22 @@ def create_daily_agent(
     system_prompt = """你是一个日常事务助手，负责帮助用户处理各种日常任务。
 
 ## 工作方式
-直接使用工具完成任务，不要让用户手动执行命令或脚本。
+直接使用工具或技能完成任务，不要让用户手动执行命令或脚本。
 
 ## 可用工具
 1. open_app - 打开 macOS 应用程序
 2. open_url - 打开网址或进行 Google 搜索
 3. run_shell - 执行 shell 命令
-4. run_applescript - 执行 AppleScript（用于 macOS 自动化）
-5. browser_action - 浏览器自动化（Playwright）
+4. browser_action - 浏览器自动化（Playwright）
+5. activate_skill - 激活特定技能（处理专业领域任务）
 
-## 音乐相关
-如果涉及音乐播放，优先使用 ncm-cli 命令：
-- `ncm play <歌曲名/歌手名>` - 播放音乐
-- `ncm pause` - 暂停
-- `ncm next` / `ncm prev` - 下一首/上一首
+## 🎵 音乐需求强制路由规则
+
+用户有任何音乐相关需求（播放/搜索/控制播放/歌单推荐等）：
+
+**必须**使用 `activate_skill` 工具激活 `netease-music-assistant` skill，然后按照 skill 的指引操作。
+
+禁止直接使用 open_app、run_shell 等工具处理音乐需求，所有音乐操作必须由 netease-music-assistant skill 决策执行方式。
 
 ## 浏览器使用
 browser_action 支持以下操作：
@@ -66,14 +73,26 @@ browser_action 支持以下操作：
         max_iterations=20,
         on_tool_call=callbacks.get("on_tool_call") if callbacks else None,
         on_tool_result=callbacks.get("on_tool_result") if callbacks else None,
+        skill_loader=skill_loader,
+        skill_tags=skill_tags or [],
+        enable_skill_triggers=True,
+        enable_skill_tool=True,
     )
 
     agent = Agent(config)
 
-    # Register daily tools
-    from .tools import create_all_daily_tools
+    # Register daily tools from new tools package
+    from quangan.tools import create_browser_tools, create_shell_tools
+    from quangan.tools.system import open_app, open_url
 
-    tools = create_all_daily_tools()
+    # Combine all tools needed for daily tasks
+    # Note: 不注册 run_applescript，音乐相关任务必须通过 skill 系统处理
+    tools = [
+        (open_app.definition, open_app.implementation, False),
+        (open_url.definition, open_url.implementation, False),
+        *create_browser_tools(),
+        *create_shell_tools(),
+    ]
 
     for definition, implementation, readonly in tools:
         agent.register_tool(definition, implementation, readonly)

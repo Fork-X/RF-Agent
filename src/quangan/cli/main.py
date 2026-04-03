@@ -75,7 +75,7 @@ coding_agent_def: ToolDefinition = make_tool_definition(
     parameters={
         "task": {
             "type": "string",
-            "description": "要完成的代码任务，请尽量详细描述需求和背景",
+            "description": "用户的原始代码需求，保留用户原话和背景，不要自行规划实现步骤",
         },
     },
     required=["task"],
@@ -90,7 +90,7 @@ daily_agent_def: ToolDefinition = make_tool_definition(
     parameters={
         "task": {
             "type": "string",
-            "description": "要完成的日常任务，请尽量详细描述需求",
+            "description": "用户的原始需求，保留用户原话，不要自行规划实现方式",
         },
     },
     required=["task"],
@@ -385,11 +385,26 @@ async def handle_command(cmd: str, session: PromptSession) -> bool:
         return True
 
     if cmd == "/tools":
-        from quangan.agents.coding.tools import ALL_CODING_TOOLS
-        from quangan.agents.daily.tools import ALL_DAILY_TOOLS
+        from quangan.tools.browser import create_browser_tools
+        from quangan.tools.code import create_code_tools
+        from quangan.tools.command import create_command_tools, create_shell_tools
+        from quangan.tools.filesystem import create_filesystem_tools
+        from quangan.tools.system import create_system_tools
 
-        tool_names = [f"  [coding] {t[0]['function']['name']}" for t in ALL_CODING_TOOLS] + [
-            f"  [daily]  {t[0]['function']['name']}" for t in ALL_DAILY_TOOLS
+        # Collect all tools
+        coding_tools = (
+            create_filesystem_tools()
+            + create_code_tools()
+            + create_command_tools("", None)
+        )
+        daily_tools = (
+            create_system_tools()
+            + create_browser_tools()
+            + create_shell_tools()
+        )
+
+        tool_names = [f"  [coding] {t[0]['function']['name']}" for t in coding_tools] + [
+            f"  [daily]  {t[0]['function']['name']}" for t in daily_tools
         ]
         display.print_tool_list(tool_names)
         return True
@@ -523,7 +538,7 @@ async def async_main() -> None:
     system_prompt = f"""你叫小枫，是芮枫的私人助理。
 
 ## 你是谁
-你是芮枫一手打造的私人助理，小枫。性格聪明温柔，说话自然随和，不会晃板。
+你是芮枫一手打造的私人助理，小枫。性格聪明温柔，说话自然随和，内容绝对真实，不会编造事实。
 平日负责帮芮枫处理各种事务——无论是技术问题、日常操作、信息查询还是随手聊几句，都能应对。
 
 ## 如何介绍自己
@@ -534,10 +549,10 @@ async def async_main() -> None:
 ## 技能与工作方式
 你内部有两个助手，可以通过工具调用完成不同类型的任务：
 - coding_agent：处理代码相关任务（读写文件、执行命令、代码搜索等）
-- daily_agent：处理日常任务（打开应用、网页搜索、系统命令、知识问答等）
+- daily_agent：处理日常任务（播放音乐、打开应用、网页搜索、系统命令、知识问答等）
 
-根据芮枫的需求分析任务类型并调用合适的助手完成。
-如果是简单的聊天或问候，直接回答就好，无需调助手。
+调用助手时，直接传递用户的原始需求，不要自行规划实现步骤或指定技术方案。
+助手内部有专业的 Skill 指引，会自行决定最佳执行方式
 
 当前工作目录: {CWD}
 
@@ -555,13 +570,14 @@ async def async_main() -> None:
     }
 
     # Initialize skill loader with absolute paths
-    skill_loader = SkillLoader(PROJECT_ROOT / ".skills")
+    skill_loader = SkillLoader(PROJECT_ROOT / "src" / "quangan" / "skills")
 
     agent_config = AgentConfig(
         client=client,
         system_prompt=system_prompt,
-        max_iterations=50,
+        max_iterations=20,
         skill_loader=skill_loader,
+        skill_tags=["router"],
         enable_skill_triggers=True,
         on_tool_call=lambda name, args: (
             display.print_tool_call("💻 Coding Agent ← 路由到", {"task": args.get("task")})
@@ -591,11 +607,18 @@ async def async_main() -> None:
                 **sub_agent_callbacks,
                 "confirm": make_confirm_fn(session),
             },
+            skill_loader=skill_loader,
+            skill_tags=["coding"],
         )
         return await coding_agent.run(args["task"])
 
     async def daily_agent_handler(args: dict[str, Any]) -> str:
-        daily_agent = create_daily_agent(client, sub_agent_callbacks)
+        daily_agent = create_daily_agent(
+            client,
+            sub_agent_callbacks,
+            skill_loader=skill_loader,
+            skill_tags=["daily"],
+        )
         return await daily_agent.run(args["task"])
 
     agent.register_tool(coding_agent_def, coding_agent_handler)
@@ -639,11 +662,6 @@ async def async_main() -> None:
     def escape(event: Any) -> None:
         if is_agent_running:
             agent.abort()
-
-    @kb.add("/")
-    def slash(event: Any) -> None:
-        # Let the character be typed first
-        pass
 
     # Main loop
     while True:
