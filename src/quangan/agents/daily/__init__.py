@@ -44,12 +44,16 @@ def create_daily_agent(
 1. open_app - 打开 macOS 应用程序
 2. open_url - 打开网址或进行 Google 搜索
 3. run_shell - 执行 shell 命令
-4. run_applescript - 执行 AppleScript（用于 macOS 自动化）
-5. browser_action - 浏览器自动化（Playwright）
+4. browser_action - 浏览器自动化（Playwright）
+5. activate_skill - 激活特定技能（处理专业领域任务）
 
-## 🎵 音乐需求：优先使用网易云 ncm-cli
+## 🎵 音乐需求强制路由规则
 
-用户有任何音乐相关需求（播放/搜索/控制播放/歌单推荐等），**第一选择是激活 netease-music-assistant 的skill，并按指引进行操作**。
+用户有任何音乐相关需求（播放/搜索/控制播放/歌单推荐等）：
+
+**必须**使用 `activate_skill` 工具激活 `netease-music-assistant` skill，然后按照 skill 的指引操作。
+
+禁止直接使用 open_app、run_shell 等工具处理音乐需求，所有音乐操作必须由 netease-music-assistant skill 决策执行方式。
 
 ## 浏览器使用
 browser_action 支持以下操作：
