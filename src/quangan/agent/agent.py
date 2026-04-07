@@ -75,7 +75,7 @@ class AgentConfig:
     client: ILLMClient
     system_prompt: str | None = None
     max_iterations: int = 50
-    verbose: bool = False
+    verbose: bool = True
     on_tool_call: Callable[[str, dict[str, Any]], None] | None = None
     on_tool_result: Callable[[str, str], None] | None = None
     compression_threshold: int = 16_000
