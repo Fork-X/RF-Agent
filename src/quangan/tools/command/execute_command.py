@@ -56,7 +56,8 @@ def _has_outside_path(cmd: str, work_dir: str) -> tuple[bool, list[str]]:
 
     for p in candidates:
         try:
-            abs_path = Path(p).resolve()
+            expanded_path = os.path.expanduser(p)  # 展开 ~ 为实际路径
+            abs_path = Path(expanded_path).resolve()
         except Exception:
             continue
 
@@ -123,11 +124,7 @@ def create_implementation(
             outside, paths = _has_outside_path(cmd, work_dir)
             if outside:
                 path_list = "\n".join(f"   • {p}" for p in paths)
-                msg = (
-                    f"⚠️  检测到操作路径超出项目目录\n"
-                    f"   命令: {cmd}\n"
-                    f"   越界路径:\n{path_list}"
-                )
+                msg = f"⚠️  检测到操作路径超出项目目录\n   命令: {cmd}\n   越界路径:\n{path_list}"
 
                 if confirm_fn:
                     ok = await confirm_fn(msg)
