@@ -7,10 +7,14 @@ Creates a stateless Coding Agent instance for code-related tasks.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from quangan.agent.agent import Agent, AgentConfig
 from quangan.llm.types import ILLMClient
 from quangan.skills import SkillLoader
+
+if TYPE_CHECKING:
+    from quangan.trace import TraceWriter
 
 
 def create_coding_agent(
@@ -19,6 +23,7 @@ def create_coding_agent(
     callbacks: dict[str, Callable] | None = None,
     skill_loader: SkillLoader | None = None,
     skill_tags: list[str] | None = None,
+    trace_writer: TraceWriter | None = None,
 ) -> Agent:
     """
     Create a Coding Agent for code-related tasks.
@@ -34,6 +39,7 @@ def create_coding_agent(
             - confirm: Async callback for y/N confirmation (for execute_command safety)
         skill_loader: Optional skill loader for loading skills by tags
         skill_tags: Optional list of skill tags to enable for this agent
+        trace_writer: Optional trace writer for execution logging
 
     Returns:
         Configured Agent instance with coding tools registered
@@ -66,6 +72,7 @@ def create_coding_agent(
         skill_tags=skill_tags or [],
         enable_skill_triggers=True,
         enable_skill_tool=True,
+        trace_writer=trace_writer,
     )
 
     agent = Agent(config)

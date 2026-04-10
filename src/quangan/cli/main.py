@@ -26,7 +26,7 @@ from quangan.agents.daily import create_daily_agent
 from quangan.cli import display
 from quangan.cli.command_picker import start_command_picker
 from quangan.cli.display import console
-from quangan.cli.session_store import clear_session, load_session, save_session
+from quangan.cli.session_store import SESSIONS_DIR, clear_session, load_session, save_session
 from quangan.config.llm_config import (
     PROVIDERS,
     LLMConfig,
@@ -37,6 +37,7 @@ from quangan.llm.client import create_llm_client
 from quangan.memory import MEMORY_BASE_DIR, create_memory_tools, get_core_memory
 from quangan.skills import SkillLoader
 from quangan.tools.types import ToolDefinition, make_tool_definition
+from quangan.trace import TraceWriter
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Environment file path
@@ -572,6 +573,9 @@ async def async_main() -> None:
     # Initialize skill loader with absolute paths
     skill_loader = SkillLoader(PROJECT_ROOT / "src" / "quangan" / "skills")
 
+    # Initialize trace writer
+    trace_writer = TraceWriter(SESSIONS_DIR / "trace_record")
+
     agent_config = AgentConfig(
         client=client,
         system_prompt=system_prompt,
@@ -579,6 +583,7 @@ async def async_main() -> None:
         skill_loader=skill_loader,
         skill_tags=["router"],
         enable_skill_triggers=True,
+        trace_writer=trace_writer,
         on_tool_call=lambda name, args: (
             display.print_tool_call("💻 Coding Agent ← 路由到", {"task": args.get("task")})
             if name == "coding_agent"
@@ -609,6 +614,7 @@ async def async_main() -> None:
             },
             skill_loader=skill_loader,
             skill_tags=["coding"],
+            trace_writer=trace_writer,
         )
         return await coding_agent.run(args["task"])
 
@@ -618,6 +624,7 @@ async def async_main() -> None:
             sub_agent_callbacks,
             skill_loader=skill_loader,
             skill_tags=["daily"],
+            trace_writer=trace_writer,
         )
         return await daily_agent.run(args["task"])
 

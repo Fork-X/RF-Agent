@@ -16,7 +16,10 @@ import inspect
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from quangan.trace import TraceWriter
 
 from quangan.llm.types import (
     AgentCallRequest,
@@ -86,6 +89,7 @@ class AgentConfig:
     enable_skill_triggers: bool = True
     skill_tags: list[str] = field(default_factory=list)
     enable_skill_tool: bool = True
+    trace_writer: TraceWriter | None = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -138,6 +142,9 @@ class Agent:
         self._skill_loader = config.skill_loader
         self._enable_skill_triggers = config.enable_skill_triggers
         self._active_skills: list[Skill] = []
+
+        # Trace writer
+        self._trace = config.trace_writer
 
         # Load initial skills
         for skill in config.skills:
@@ -549,6 +556,15 @@ class Agent:
             if self._on_tool_result:
                 self._on_tool_result(tool_name, str(result))
 
+            # Trace: 记录完整工具结果（不截断）
+            if self._trace:
+                self._trace.log("tool_result", {
+                    "tool_name": tool_name,
+                    "arguments": args,
+                    "result": str(result),
+                    "success": True,
+                })
+
             return ToolResult(
                 tool_call_id=tool_call["id"],
                 role="tool",
@@ -557,6 +573,14 @@ class Agent:
             )
 
         except Exception as e:
+            # Trace: 记录工具执行失败
+            if self._trace:
+                self._trace.log("tool_result", {
+                    "tool_name": tool_name,
+                    "success": False,
+                    "error": str(e),
+                })
+
             return ToolResult(
                 tool_call_id=tool_call["id"],
                 role="tool",
@@ -609,6 +633,10 @@ class Agent:
         self._aborted = False
         self._cancel_event.clear()
 
+        # Start trace for this run
+        if self._trace:
+            self._trace.start_trace()
+
         # Check for skill triggers before adding user message
         if self._enable_skill_triggers:
             triggered_skills = self._check_skill_triggers(user_message)
@@ -640,9 +668,19 @@ class Agent:
 
             # Call LLM
             try:
+                llm_messages = self._get_llm_messages()
+
+                # Trace: 记录发给 LLM 的完整 Prompt
+                if self._trace:
+                    self._trace.log("llm_request", {
+                        "iteration": iteration,
+                        "messages": llm_messages,
+                        "tools": [t["function"]["name"] for t in tools] if tools else [],
+                    })
+
                 result = await self._client.agent_call(
                     AgentCallRequest(
-                        messages=self._get_llm_messages(),
+                        messages=llm_messages,
                         tools=tools if tools else None,
                         cancel_event=self._cancel_event,
                     )
@@ -662,6 +700,22 @@ class Agent:
                 # Check for compression trigger
                 if self._last_token_usage.total >= self._compression_threshold:
                     await self._compress_context()
+
+            # Trace: 记录 LLM 完整响应
+            if self._trace:
+                self._trace.log("llm_response", {
+                    "iteration": iteration,
+                    "message": result.message,
+                    "tool_calls": [
+                        {"name": tc["function"]["name"], "arguments": tc["function"]["arguments"]}
+                        for tc in (result.tool_calls or [])
+                    ],
+                    "usage": {
+                        "prompt": result.usage.prompt,
+                        "completion": result.usage.completion,
+                        "total": result.usage.total,
+                    } if result.usage else None,
+                })
 
             # Add assistant message to history
             self._messages.append(result.message)
