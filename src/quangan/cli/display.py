@@ -27,9 +27,9 @@ def print_header(model: str) -> None:
     """Print welcome header."""
     console.print()
     console.print("[bold cyan]╔═══════════════════════════════════════╗[/]")
-    console.print("[bold cyan]║[/] [bold magenta]小枫 - 芮枫的私人助理[/]            [bold cyan]║[/]")
-    console.print("[bold cyan]║[/] [dim]RF Agent CLI v1.0[/]             [bold cyan]║[/]")
-    console.print(f"[bold cyan]║[/] [dim]模型: {model:<27}[/] [bold cyan]║[/]")
+    console.print("[bold cyan]║[/] [bold magenta]小枫 - 芮枫的私人助理[/]                 [bold cyan]║[/]")
+    console.print("[bold cyan]║[/] [dim]RF Agent CLI v1.0[/]                     [bold cyan]║[/]")
+    console.print(f"[bold cyan]║[/] [dim]模型: {model:<27}[/]     [bold cyan]║[/]")
     console.print("[bold cyan]╚═══════════════════════════════════════╝[/]")
     console.print()
 
