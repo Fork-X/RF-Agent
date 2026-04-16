@@ -35,6 +35,9 @@ triggers:
 
 ---
 
+## 打开网易云
+需要打开网易云请执行指令 `open -a \"NetEaseMusic\"`
+
 ## CLI 工具使用
 CLI的工具请直接使用`netease-music-cli` skill
 

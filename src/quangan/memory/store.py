@@ -11,10 +11,9 @@ Memory directory is fixed at the QUANGAN-py project root, independent of CWD.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 # Memory base directory (QUANGAN-py project root)
 MEMORY_BASE_DIR = Path(__file__).resolve().parents[3] / ".memory"
@@ -85,7 +84,10 @@ def get_memory_dir(cwd: str) -> Path:
     Returns:
         Path to .memory directory
     """
-    dir_path = Path(cwd) / ".memory"
+    dir_path = Path(cwd)
+    # 兼容调用方直接传入 .memory 目录的情况，避免重复嵌套
+    if dir_path.name != ".memory":
+        dir_path = dir_path / ".memory"
     dir_path.mkdir(parents=True, exist_ok=True)
 
     life_dir = dir_path / "life"
@@ -116,9 +118,7 @@ def get_core_memory(cwd: str) -> CoreMemoryData:
 
     try:
         data = json.loads(file_path.read_text(encoding="utf-8"))
-        memories = [
-            CoreMemoryItem(**m) for m in data.get("memories", [])
-        ]
+        memories = [CoreMemoryItem(**m) for m in data.get("memories", [])]
         return CoreMemoryData(
             updated_at=data.get("updatedAt", _today_str()),
             memories=memories,

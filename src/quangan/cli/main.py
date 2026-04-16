@@ -38,6 +38,7 @@ from quangan.memory import MEMORY_BASE_DIR, create_memory_tools, get_core_memory
 from quangan.skills import SkillLoader
 from quangan.tools.types import ToolDefinition, make_tool_definition
 from quangan.trace import TraceWriter
+from quangan.utils.logger import get_logger, setup_logging
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Environment file path
@@ -61,6 +62,7 @@ is_plan_mode = False
 is_agent_running = False
 current_spinner: Any = None
 _life_memory_update_count = 0
+logger = get_logger("cli")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -133,6 +135,7 @@ async def update_life_memory_async() -> None:
         ]
 
         if not history:
+            logger.debug("update_life_memory_async: no active history to summarize")
             return
 
         # Build summary prompt
@@ -153,20 +156,26 @@ async def update_life_memory_async() -> None:
 
         from quangan.memory import append_life_memory
 
-        append_life_memory(str(MEMORY_BASE_DIR), theme.strip(), summary)
-
+        filename = append_life_memory(str(MEMORY_BASE_DIR), theme.strip(), summary)
         _life_memory_update_count += 1
+        logger.info("Life memory saved: %s", filename)
 
         # Every 3 compressions, trigger consolidation
         if _life_memory_update_count % 3 == 0:
+            logger.info(
+                "Triggering core memory consolidation (count=%d)",
+                _life_memory_update_count,
+            )
             from quangan.memory import create_memory_tool_impls
 
             impls = create_memory_tool_impls(client, str(MEMORY_BASE_DIR))
-            await impls["consolidate_impl"]()
+            result = await impls["consolidate_impl"]()
+            logger.info("Core memory consolidation result: %s", result)
 
     except Exception:
-        # Silent failure
-        pass
+        # 原实现静默吞掉异常，导致记忆丢失且无任何观测。
+        # 改为记录 ERROR 并带上堆栈，不影响主对话流程，但问题可追踪。
+        logger.error("Life memory update failed", exc_info=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -394,15 +403,9 @@ async def handle_command(cmd: str, session: PromptSession) -> bool:
 
         # Collect all tools
         coding_tools = (
-            create_filesystem_tools()
-            + create_code_tools()
-            + create_command_tools("", None)
+            create_filesystem_tools() + create_code_tools() + create_command_tools("", None)
         )
-        daily_tools = (
-            create_system_tools()
-            + create_browser_tools()
-            + create_shell_tools()
-        )
+        daily_tools = create_system_tools() + create_browser_tools() + create_shell_tools()
 
         tool_names = [f"  [coding] {t[0]['function']['name']}" for t in coding_tools] + [
             f"  [daily]  {t[0]['function']['name']}" for t in daily_tools
@@ -718,10 +721,14 @@ async def async_main() -> None:
 
 def main() -> None:
     """Main entry point."""
+    # 初始化日志系统：文件 DEBUG，控制台默认 ERROR（可通过 QUANGAN_LOG_LEVEL 覆盖）
+    setup_logging()
+    logger.info("QuanGan starting...")
+
     try:
         asyncio.run(async_main())
     except KeyboardInterrupt:
-        pass
+        logger.info("Interrupted by user")
 
 
 if __name__ == "__main__":

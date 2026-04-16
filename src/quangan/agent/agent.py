@@ -28,6 +28,9 @@ from quangan.llm.types import (
 )
 from quangan.skills import Skill, SkillLoader
 from quangan.tools.types import ToolCall, ToolDefinition, ToolRegistryEntry, ToolResult
+from quangan.utils.logger import get_logger
+
+logger = get_logger("agent")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Exceptions
@@ -279,11 +282,13 @@ class Agent:
             skill: Skill to inject
         """
         skill_prompt = skill.to_system_prompt()
-        self._messages.append({
-            "role": "system",
-            "content": f"[Skill 上下文 - {skill.name}]\n{skill_prompt}",
-            "_skill": skill.name,
-        })
+        self._messages.append(
+            {
+                "role": "system",
+                "content": f"[Skill 上下文 - {skill.name}]\n{skill_prompt}",
+                "_skill": skill.name,
+            }
+        )
 
     def _check_skill_triggers(self, message: str) -> list[Skill]:
         """
@@ -305,8 +310,7 @@ class Agent:
 
         # 按 priority 降序，同优先级按触发匹配数排序
         triggered.sort(
-            key=lambda s: (s.metadata.priority, s.get_trigger_score(message)),
-            reverse=True
+            key=lambda s: (s.metadata.priority, s.get_trigger_score(message)), reverse=True
         )
         return triggered
 
@@ -346,8 +350,7 @@ class Agent:
         """
         # Get system messages (excluding _summary markers)
         system_msgs = [
-            m for m in self._messages
-            if m.get("role") == "system" and not m.get("_summary")
+            m for m in self._messages if m.get("role") == "system" and not m.get("_summary")
         ]
 
         # Find latest summary position
@@ -364,8 +367,7 @@ class Agent:
         else:
             # No summary: filter out archived messages
             context_msgs = [
-                m for m in self._messages
-                if not m.get("_archived") and m.get("role") != "system"
+                m for m in self._messages if not m.get("_archived") and m.get("role") != "system"
             ]
 
         # Combine and strip metadata
@@ -393,10 +395,7 @@ class Agent:
         KEEP_RECENT = 6
 
         # Count active non-system messages
-        active = [
-            m for m in self._messages
-            if not m.get("_archived") and m.get("role") != "system"
-        ]
+        active = [m for m in self._messages if not m.get("_archived") and m.get("role") != "system"]
         if len(active) <= KEEP_RECENT:
             return
 
@@ -434,6 +433,12 @@ class Agent:
 
         summary_prompt = "\n\n".join(summary_parts)
 
+        logger.info(
+            "开始上下文压缩: 活跃消息 %d 条, 待压缩 %d 条",
+            len(active),
+            len(to_compress),
+        )
+
         # Call LLM for summary
         try:
             summary = await self._client.chat(
@@ -452,10 +457,14 @@ class Agent:
                     },
                 ]
             )
-        except Exception:
+        except Exception as e:
+            # 按用户要求：压缩失败时不删除旧消息，保留现场以便排查根因
+            logger.error("上下文压缩失败: %s", e, exc_info=True)
+            logger.error("压缩内容摘要(前2000字): %s", summary_prompt[:2000])
             return
 
         if not summary:
+            logger.warning("上下文压缩收到空摘要，跳过本次压缩")
             return
 
         # Build summary marker node
@@ -488,6 +497,12 @@ class Agent:
 
         after_count = len([m for m in self._messages if not m.get("_archived")])
 
+        logger.info(
+            "上下文压缩完成: %d -> %d 条有效消息",
+            before_count,
+            after_count,
+        )
+
         if self._on_compress:
             self._on_compress(before_count, after_count)
 
@@ -509,9 +524,7 @@ class Agent:
             List of tool definitions
         """
         return [
-            entry.definition
-            for entry in self._tools.values()
-            if not plan_only or entry.readonly
+            entry.definition for entry in self._tools.values() if not plan_only or entry.readonly
         ]
 
     async def _execute_tool_call(self, tool_call: ToolCall) -> ToolResult:
@@ -558,12 +571,15 @@ class Agent:
 
             # Trace: 记录完整工具结果（不截断）
             if self._trace:
-                self._trace.log("tool_result", {
-                    "tool_name": tool_name,
-                    "arguments": args,
-                    "result": str(result),
-                    "success": True,
-                })
+                self._trace.log(
+                    "tool_result",
+                    {
+                        "tool_name": tool_name,
+                        "arguments": args,
+                        "result": str(result),
+                        "success": True,
+                    },
+                )
 
             return ToolResult(
                 tool_call_id=tool_call["id"],
@@ -575,11 +591,14 @@ class Agent:
         except Exception as e:
             # Trace: 记录工具执行失败
             if self._trace:
-                self._trace.log("tool_result", {
-                    "tool_name": tool_name,
-                    "success": False,
-                    "error": str(e),
-                })
+                self._trace.log(
+                    "tool_result",
+                    {
+                        "tool_name": tool_name,
+                        "success": False,
+                        "error": str(e),
+                    },
+                )
 
             return ToolResult(
                 tool_call_id=tool_call["id"],
@@ -672,11 +691,14 @@ class Agent:
 
                 # Trace: 记录发给 LLM 的完整 Prompt
                 if self._trace:
-                    self._trace.log("llm_request", {
-                        "iteration": iteration,
-                        "messages": llm_messages,
-                        "tools": [t["function"]["name"] for t in tools] if tools else [],
-                    })
+                    self._trace.log(
+                        "llm_request",
+                        {
+                            "iteration": iteration,
+                            "messages": llm_messages,
+                            "tools": [t["function"]["name"] for t in tools] if tools else [],
+                        },
+                    )
 
                 result = await self._client.agent_call(
                     AgentCallRequest(
@@ -703,19 +725,27 @@ class Agent:
 
             # Trace: 记录 LLM 完整响应
             if self._trace:
-                self._trace.log("llm_response", {
-                    "iteration": iteration,
-                    "message": result.message,
-                    "tool_calls": [
-                        {"name": tc["function"]["name"], "arguments": tc["function"]["arguments"]}
-                        for tc in (result.tool_calls or [])
-                    ],
-                    "usage": {
-                        "prompt": result.usage.prompt,
-                        "completion": result.usage.completion,
-                        "total": result.usage.total,
-                    } if result.usage else None,
-                })
+                self._trace.log(
+                    "llm_response",
+                    {
+                        "iteration": iteration,
+                        "message": result.message,
+                        "tool_calls": [
+                            {
+                                "name": tc["function"]["name"],
+                                "arguments": tc["function"]["arguments"],
+                            }
+                            for tc in (result.tool_calls or [])
+                        ],
+                        "usage": {
+                            "prompt": result.usage.prompt,
+                            "completion": result.usage.completion,
+                            "total": result.usage.total,
+                        }
+                        if result.usage
+                        else None,
+                    },
+                )
 
             # Add assistant message to history
             self._messages.append(result.message)
@@ -765,7 +795,6 @@ class Agent:
     def clear_history(self) -> None:
         """Clear message history (preserve system prompt)."""
         system_messages = [
-            m for m in self._messages
-            if m.get("role") == "system" and not m.get("_summary")
+            m for m in self._messages if m.get("role") == "system" and not m.get("_summary")
         ]
         self._messages = system_messages

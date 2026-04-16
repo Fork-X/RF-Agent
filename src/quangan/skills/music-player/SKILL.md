@@ -39,7 +39,7 @@ tags:
 ### 网易云音乐（默认）
 当用户提到"网易云"、"云音乐"、"ncm"、"netease"，或**未指定平台**时，调用 daily_agent，直接传递用户的原始请求。
 
-Daily Agent 内部有专业的音乐执行技能（netease-music-assistant），会自行决定使用 ncm-cli、open_app 还是其他方式。**你不需要规划实现步骤。**
+Daily Agent 内部有专业的音乐执行技能（netease-music-assistant），会自行决定使用 ncm-cli。**你不需要规划实现步骤。**
 
 ### QQ音乐（占位）
 当用户明确提到"QQ音乐"、"qqmusic"时，直接回复：

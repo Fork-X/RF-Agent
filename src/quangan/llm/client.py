@@ -8,8 +8,10 @@ This module provides:
 
 from __future__ import annotations
 
+import asyncio
 import json
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 
 import httpx
 
@@ -73,9 +75,7 @@ class LLMClient(ILLMClient):
             headers.update(self._config.headers)
         return headers
 
-    async def chat(
-        self, messages: list[ChatMessage], options: ChatOptions | None = None
-    ) -> str:
+    async def chat(self, messages: list[ChatMessage], options: ChatOptions | None = None) -> str:
         """
         Simple non-streaming chat completion.
 
@@ -90,9 +90,10 @@ class LLMClient(ILLMClient):
         body: dict[str, Any] = {
             "model": self._config.model,
             "messages": messages,
-            "temperature": options.temperature if options else 0.7,
         }
         if options:
+            if options.temperature is not None:
+                body["temperature"] = options.temperature
             if options.max_tokens:
                 body["max_tokens"] = options.max_tokens
             if options.top_p:
@@ -128,10 +129,11 @@ class LLMClient(ILLMClient):
         body: dict[str, Any] = {
             "model": self._config.model,
             "messages": messages,
-            "temperature": options.temperature if options else 0.7,
             "stream": True,
         }
         if options:
+            if options.temperature is not None:
+                body["temperature"] = options.temperature
             if options.max_tokens:
                 body["max_tokens"] = options.max_tokens
             if options.top_p:
@@ -145,7 +147,7 @@ class LLMClient(ILLMClient):
         ) as response:
             if not response.is_success:
                 error_text = await response.aread()
-                raise RuntimeError(f"API 调用失败: {response.status_code}")
+                raise RuntimeError(f"API 调用失败: {response.status_code} - {error_text}")
 
             buffer = ""
             async for line in response.aiter_lines():
@@ -161,7 +163,9 @@ class LLMClient(ILLMClient):
                         if ln.startswith("data: "):
                             try:
                                 chunk = json.loads(ln[6:])
-                                content = chunk.get("choices", [{}])[0].get("delta", {}).get("content")
+                                content = (
+                                    chunk.get("choices", [{}])[0].get("delta", {}).get("content")
+                                )
                                 if content:
                                     yield content
                             except json.JSONDecodeError:
@@ -282,6 +286,11 @@ def create_llm_client(config: LLMConfig) -> ILLMClient:
     Routes to the appropriate client implementation based on the
     protocol field in the configuration.
 
+    返回的 client 会被 LoggingClient 自动包装，从而统一获得：
+    - DEBUG 级别请求/响应日志
+    - ERROR 级别失败日志
+    - 不引入自动重试，保持原始调用行为不变
+
     Args:
         config: LLM configuration
 
@@ -292,9 +301,11 @@ def create_llm_client(config: LLMConfig) -> ILLMClient:
         # Lazy import to avoid circular dependency
         from quangan.llm.anthropic_client import AnthropicClient
 
-        return AnthropicClient(config)
-    return LLMClient(config)
+        inner: ILLMClient = AnthropicClient(config)
+    else:
+        inner = LLMClient(config)
 
+    # 统一包装可观测性日志，保持原始 client 零侵入
+    from quangan.llm.wrapper import LoggingClient
 
-# Import for annotation
-import asyncio
+    return LoggingClient(inner)

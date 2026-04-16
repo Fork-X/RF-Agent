@@ -9,10 +9,12 @@ Three tools for memory management:
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from quangan.llm.types import ILLMClient
 from quangan.memory.store import (
+    CoreMemoryData,
     CoreMemoryItem,
     append_life_memory,
     get_core_memory,
@@ -20,6 +22,9 @@ from quangan.memory.store import (
     save_core_memory,
 )
 from quangan.tools.types import ToolDefinition, make_tool_definition
+from quangan.utils.logger import get_logger
+
+logger = get_logger("memory")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -92,11 +97,7 @@ def create_memory_tool_impls(client: ILLMClient, cwd: str) -> dict[str, Any]:
         core = get_core_memory(cwd)
 
         # Keyword matching on core memory
-        relevant = [
-            m
-            for m in core.memories
-            if any(kw in m.content.lower() for kw in query_words)
-        ]
+        relevant = [m for m in core.memories if any(kw in m.content.lower() for kw in query_words)]
 
         recent_life = get_recent_life_memories(cwd, 7)
 
@@ -118,8 +119,7 @@ def create_memory_tool_impls(client: ILLMClient, cwd: str) -> dict[str, Any]:
         if recent_life:
             result += f"## 最近 7 天日常记忆（{len(recent_life)} 个文件）\n"
             result += "\n\n---\n\n".join(
-                f"### {f.filename}\n{f.content[:400]}"
-                for f in recent_life
+                f"### {f.filename}\n{f.content[:400]}" for f in recent_life
             )
         else:
             result += "## 日常记忆\n暂无日常记忆记录。"
@@ -144,9 +144,7 @@ def create_memory_tool_impls(client: ILLMClient, cwd: str) -> dict[str, Any]:
         current_core = get_core_memory(cwd)
 
         # Build prompt
-        life_content = "\n\n".join(
-            f"=== {f.filename} ===\n{f.content}" for f in recent_life
-        )
+        life_content = "\n\n".join(f"=== {f.filename} ===\n{f.content}" for f in recent_life)
 
         existing_core = (
             "\n".join(f"- [id:{m.id}] {m.content}" for m in current_core.memories)
@@ -192,14 +190,19 @@ def create_memory_tool_impls(client: ILLMClient, cwd: str) -> dict[str, Any]:
                 for m in parsed.get("memories", [])
             ]
 
-            save_core_memory(cwd, CoreMemoryData(
-                updated_at=datetime.now().strftime("%Y-%m-%d"),
-                memories=memories,
-            ))
+            save_core_memory(
+                cwd,
+                CoreMemoryData(
+                    updated_at=datetime.now().strftime("%Y-%m-%d"),
+                    memories=memories,
+                ),
+            )
 
             return f"✅ 核心记忆已更新，共 {len(memories)} 条"
 
         except Exception as e:
+            # 原实现仅将错误信息返回给 LLM，未留下持久化日志，排查困难
+            logger.error("Core memory consolidation failed: %s", e, exc_info=True)
             return f"❌ 记忆整合失败: {e}"
 
     return {
@@ -207,10 +210,3 @@ def create_memory_tool_impls(client: ILLMClient, cwd: str) -> dict[str, Any]:
         "update_life_impl": update_life_impl,
         "consolidate_impl": consolidate_impl,
     }
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Imports
-# ─────────────────────────────────────────────────────────────────────────────
-
-from datetime import datetime
