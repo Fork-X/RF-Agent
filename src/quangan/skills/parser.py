@@ -11,10 +11,13 @@ from pathlib import Path
 
 import yaml
 
+from quangan.utils.errors import SkillError
+
 from .models import Skill, SkillMetadata
 
 
-class SkillParseError(Exception):
+# Refactor: [设计缺陷] 让 SkillParseError 继承 SkillError，统一异常体系
+class SkillParseError(SkillError):
     """Raised when a skill file cannot be parsed."""
     pass
 

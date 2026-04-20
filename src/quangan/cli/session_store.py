@@ -12,8 +12,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-# Sessions directory
-SESSIONS_DIR = Path(__file__).resolve().parents[3] / ".sessions"
+from quangan.config.paths import get_sessions_dir
+
+# Refactor: [设计缺陷] 消除硬编码路径依赖
+SESSIONS_DIR = get_sessions_dir()
 
 
 def _ensure_sessions_dir() -> None:

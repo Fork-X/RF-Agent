@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -26,7 +27,7 @@ from quangan.llm.types import (
     ILLMClient,
     TokenUsage,
 )
-from quangan.skills import Skill, SkillLoader
+from quangan.skills import Skill, SkillLoader, SkillValidator
 from quangan.tools.types import ToolCall, ToolDefinition, ToolRegistryEntry, ToolResult
 from quangan.utils.logger import get_logger
 
@@ -76,6 +77,7 @@ class AgentConfig:
         enable_skill_triggers: Whether to auto-activate skills based on triggers (default: True)
         skill_tags: Tags to filter skills when loading from skill_loader (default: empty list)
         enable_skill_tool: Whether to register activate_skill tool for LLM (default: False)
+        keep_recent_messages: Number of recent messages to keep during compression (default: 6)
     """
 
     client: ILLMClient
@@ -93,6 +95,7 @@ class AgentConfig:
     skill_tags: list[str] = field(default_factory=list)
     enable_skill_tool: bool = True
     trace_writer: TraceWriter | None = None
+    keep_recent_messages: int = 6  # Refactor: [可维护性] 将硬编码魔数提取为可配置参数
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -149,6 +152,9 @@ class Agent:
         # Trace writer
         self._trace = config.trace_writer
 
+        # Configuration
+        self._config = config
+
         # Load initial skills
         for skill in config.skills:
             self._skills[skill.name] = skill
@@ -172,6 +178,12 @@ class Agent:
         # Register activate_skill tool if enabled
         if config.enable_skill_tool and self._skills:
             self._register_skill_tools()
+
+        # Refactor: [设计缺陷] 添加技能-工具依赖验证，初始化后检查
+        if self._skills:
+            registered_tool_names = set(self._tools.keys())
+            validator = SkillValidator(registered_tool_names)
+            validator.validate_all(self._skills)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Tool Registration
@@ -387,22 +399,23 @@ class Agent:
         Compress old messages using rolling summary.
 
         Strategy:
-        - Keep last 6 active messages (~3 conversation rounds)
+        - Keep last N active messages (configured by keep_recent_messages)
         - LLM generates summary of older messages
         - Mark old messages with _archived=True
         - Insert _summary=True marker node
         """
-        KEEP_RECENT = 6
+        # Refactor: [可维护性] 将硬编码魔数提取为可配置参数
+        keep_recent = self._config.keep_recent_messages
 
         # Count active non-system messages
         active = [m for m in self._messages if not m.get("_archived") and m.get("role") != "system"]
-        if len(active) <= KEEP_RECENT:
+        if len(active) <= keep_recent:
             return
 
-        # 待压缩：从头到倒数第6条（不含倒数第6条）
-        to_compress = active[:-KEEP_RECENT]
-        # 保持活跃：从倒数第6条到末尾（含倒数第6条）
-        to_keep = active[-KEEP_RECENT:]
+        # 待压缩：从头到倒数第 keep_recent 条（不含）
+        to_compress = active[:-keep_recent]
+        # 保持活跃：从倒数第 keep_recent 条到末尾（含）
+        to_keep = active[-keep_recent:]
         before_count = len(self._messages)
 
         # Notify external: compression starting (supports async)
@@ -651,6 +664,7 @@ class Agent:
         # Reset state for this run
         self._aborted = False
         self._cancel_event.clear()
+        run_start = time.time()
 
         # Start trace for this run
         if self._trace:
@@ -766,6 +780,13 @@ class Agent:
             # No tool calls: return final response
             if self._verbose:
                 print("\n✅ Agent 执行完成")
+
+            elapsed = time.time() - run_start
+            logger.info(
+                "Agent run completed in %.1fs, iterations: %d",
+                elapsed,
+                iteration,
+            )
 
             content = result.message.get("content", "")
             return content if isinstance(content, str) else ""

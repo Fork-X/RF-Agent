@@ -16,6 +16,7 @@ from typing import Any
 import httpx
 
 from quangan.config.llm_config import LLMConfig
+from quangan.llm._cancel_support import request_with_retry
 from quangan.llm.types import (
     AgentCallRequest,
     AgentCallResponse,
@@ -50,7 +51,8 @@ class LLMClient(ILLMClient):
         """
         self._config = config
         self._validate_config()
-        self._client = httpx.AsyncClient(timeout=120.0)
+        # Refactor: [可维护性] 使用可配置超时，消除硬编码
+        self._client = httpx.AsyncClient(timeout=float(config.timeout_seconds))
 
     def _validate_config(self) -> None:
         """Validate that required configuration fields are present."""
@@ -205,15 +207,14 @@ class LLMClient(ILLMClient):
         if req.tools and len(req.tools) > 0:
             body["tools"] = req.tools
 
-        response = await self._client.post(
-            url,
-            headers=self._build_headers(),
-            json=body,
+        # Refactor: [HIGH-RISK] HTTP阻塞期间无法响应ESC中断，改用双等待模式 + 重试策略
+        headers = self._build_headers()
+        response = await request_with_retry(
+            lambda: self._client.post(url, headers=headers, json=body),
+            req.cancel_event,
+            max_retries=self._config.max_retries,
+            retry_status_codes=self._config.retry_status_codes,
         )
-
-        # Check for cancellation after request
-        if req.cancel_event and req.cancel_event.is_set():
-            raise asyncio.CancelledError("Request cancelled")
 
         if not response.is_success:
             raise RuntimeError(f"API 调用失败: {response.status_code}")

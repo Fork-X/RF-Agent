@@ -10,14 +10,15 @@ This module handles:
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Literal
 
 from dotenv import load_dotenv
-from pathlib import Path
 
-# Load .env from project root (same directory as this package)
-_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
+from quangan.config.paths import get_env_file
+
+# Refactor: [设计缺陷] 消除硬编码路径依赖
+_ENV_FILE = get_env_file()
 load_dotenv(_ENV_FILE)
 
 
@@ -48,6 +49,9 @@ class LLMConfig:
         model: Model name to use
         headers: Optional additional headers
         protocol: API protocol ('openai' or 'anthropic')
+        timeout_seconds: HTTP request timeout in seconds
+        max_retries: Maximum number of retry attempts
+        retry_status_codes: HTTP status codes that trigger a retry
     """
 
     provider: str
@@ -56,6 +60,10 @@ class LLMConfig:
     model: str
     headers: dict[str, str] | None = None
     protocol: Literal["openai", "anthropic"] = "openai"
+    # Refactor: [可维护性] 添加可配置超时和重试参数，消除硬编码
+    timeout_seconds: int = 120
+    max_retries: int = 2
+    retry_status_codes: tuple[int, ...] = (429, 500, 502, 503)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -113,29 +121,30 @@ MODEL_CONTEXT_LIMITS: dict[str, int] = {
 
 
 def get_model_context_limit(model: str) -> int:
-    """
-    Get the context limit for a model.
+    """Get context window size for a model.
 
-    Performs exact match first, then prefix match.
-    Returns 128k as default for unknown models.
+    Refactor: [设计缺陷] 原前缀匹配可能匹配到错误的短前缀（如 'qwen' 匹配 'qwen-max-longcontext'），
+    改为最长前缀匹配算法。
 
     Args:
-        model: Model name to look up
+        model: Model name string.
 
     Returns:
-        Context limit in tokens
+        Context window size in tokens.
     """
-    # Exact match
+    # 精确匹配优先
     if model in MODEL_CONTEXT_LIMITS:
         return MODEL_CONTEXT_LIMITS[model]
 
-    # Prefix match
-    for prefix, limit in MODEL_CONTEXT_LIMITS.items():
-        if model.startswith(prefix):
-            return limit
+    # 最长前缀匹配
+    best_match = ""
+    best_limit = 128_000  # 默认值
+    for key, limit in MODEL_CONTEXT_LIMITS.items():
+        if model.startswith(key) and len(key) > len(best_match):
+            best_match = key
+            best_limit = limit
 
-    # Default: 128k
-    return 128_000
+    return best_limit
 
 
 # ─────────────────────────────────────────────────────────────────────────────

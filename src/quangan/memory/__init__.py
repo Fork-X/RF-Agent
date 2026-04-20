@@ -20,6 +20,7 @@ from .store import (
     CoreMemoryItem,
     append_life_memory,
     get_core_memory,
+    get_memory_dir,
     get_recent_life_memories,
 )
 from .tools import (
@@ -59,6 +60,7 @@ __all__ = [
     # Store functions
     "MEMORY_BASE_DIR",
     "get_core_memory",
+    "get_memory_dir",
     "append_life_memory",
     "get_recent_life_memories",
     # Types

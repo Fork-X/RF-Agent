@@ -1,4 +1,5 @@
 ---
+# Refactor: [可维护性] 统一 SKILL.md 格式，补充缺失的 tools 字段
 name: music-player
 description: 音乐播放路由中心。作为所有音乐请求的第一入口，负责识别用户意图并路由到对应平台的技能模块。支持网易云音乐（详细处理）和QQ音乐（占位待开发）。
 version: 2.0.0
@@ -28,6 +29,10 @@ tags:
   - daily
   - entertainment
   - router
+tools:
+  - run_applescript
+  - open_app
+  - open_url
 ---
 
 # 音乐播放路由中心

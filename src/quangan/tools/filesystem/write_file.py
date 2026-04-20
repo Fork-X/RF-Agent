@@ -6,10 +6,10 @@ Creates or overwrites a file with content.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from quangan.tools.types import ToolDefinition, make_tool_definition
+from quangan.tools.utils import normalize_path
 
 # Tool definition
 definition: ToolDefinition = make_tool_definition(
@@ -42,7 +42,8 @@ def implementation(args: dict[str, Any]) -> str:
     Returns:
         Success message with stats, or error message
     """
-    file_path = Path(args["file_path"]).expanduser().resolve()
+    # Refactor: [代码重复] 使用共享工具函数，见 tools/utils.py
+    file_path = normalize_path(args["file_path"])
     content = args["content"]
 
     try:

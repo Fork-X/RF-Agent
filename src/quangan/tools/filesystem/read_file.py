@@ -6,10 +6,10 @@ Reads file content with optional line range support.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from quangan.tools.types import ToolDefinition, make_tool_definition
+from quangan.tools.utils import normalize_path, validate_file_exists
 
 # Tool definition
 definition: ToolDefinition = make_tool_definition(
@@ -47,16 +47,15 @@ def implementation(args: dict[str, Any]) -> str:
     Returns:
         File content with line numbers, or error message
     """
-    file_path = Path(args["file_path"]).expanduser().resolve()
+    # Refactor: [代码重复] 使用共享工具函数，见 tools/utils.py
+    file_path = normalize_path(args["file_path"])
     start_line = args.get("start_line")
     end_line = args.get("end_line")
 
-    # Check if file exists
-    if not file_path.exists():
-        return f"❌ 文件不存在: {file_path}"
-
-    if not file_path.is_file():
-        return f"❌ 不是文件: {file_path}"
+    # Refactor: [代码重复] 使用共享工具函数，见 tools/utils.py
+    error = validate_file_exists(file_path)
+    if error:
+        return error
 
     # Try to read as text
     try:

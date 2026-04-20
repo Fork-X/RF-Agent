@@ -1,7 +1,9 @@
 ---
+# Refactor: [可维护性] 统一 SKILL.md 格式，补充缺失的 priority/tools 字段
 name: python-code-review
 description: Python 代码审查助手。当用户请求代码审查、代码优化建议、代码质量检查或 Python 最佳实践指导时使用此 skill。
 version: 1.0.0
+priority: 5
 tags:
   - router
   - coding
@@ -17,6 +19,9 @@ triggers:
   - 重构建议
   - python 规范
   - pep8
+tools:
+  - read_file
+  - search_code
 ---
 
 # Python 代码审查指南

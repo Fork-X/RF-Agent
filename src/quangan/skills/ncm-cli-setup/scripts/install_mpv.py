@@ -4,10 +4,10 @@ Cross-platform mpv installer for ncm-cli.
 Detects OS and installs mpv using the appropriate package manager.
 """
 
-import sys
-import subprocess
-import shutil
 import platform
+import shutil
+import subprocess
+import sys
 
 
 def run(cmd, check=True):

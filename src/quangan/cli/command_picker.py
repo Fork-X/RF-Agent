@@ -6,8 +6,9 @@ Provides an interactive TUI menu for selecting commands.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from prompt_toolkit import Application
 from prompt_toolkit.key_binding import KeyBindings

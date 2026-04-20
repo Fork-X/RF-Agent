@@ -7,12 +7,12 @@ Provides terminal output formatting using rich library.
 from __future__ import annotations
 
 import json
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Generator
+from typing import Any
 
 from rich.console import Console
 from rich.status import Status
-from rich.text import Text
 
 # Global console instance
 console = Console()
@@ -27,7 +27,10 @@ def print_header(model: str) -> None:
     """Print welcome header."""
     console.print()
     console.print("[bold cyan]╔═══════════════════════════════════════╗[/]")
-    console.print("[bold cyan]║[/] [bold magenta]小枫 - 芮枫的私人助理[/]                 [bold cyan]║[/]")
+    console.print(
+        "[bold cyan]║[/] [bold magenta]小枫 - 芮枫的私人助理[/]"
+        "                 [bold cyan]║[/]"
+    )
     console.print("[bold cyan]║[/] [dim]RF Agent CLI v1.0[/]                     [bold cyan]║[/]")
     console.print(f"[bold cyan]║[/] [dim]模型: {model:<27}[/]     [bold cyan]║[/]")
     console.print("[bold cyan]╚═══════════════════════════════════════╝[/]")
@@ -68,7 +71,7 @@ def print_assistant_message(content: str) -> None:
     if len(lines) == 1:
         console.print(f"[magenta]小枫[/] [dim]>[/] {content}")
     else:
-        console.print(f"[magenta]小枫[/] [dim]>[/]")
+        console.print("[magenta]小枫[/] [dim]>[/]")
         console.print(content)
 
 

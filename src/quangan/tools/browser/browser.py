@@ -18,9 +18,6 @@ Actions:
 
 from __future__ import annotations
 
-import asyncio
-import json
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
@@ -32,6 +29,7 @@ from quangan.tools.types import ToolDefinition, make_tool_definition
 
 CDP_ENDPOINT = "http://localhost:9222"
 PROFILE_DIR = Path.home() / ".xiaoyu-browser-profile"
+MAX_ELEMENTS = 20  # Refactor: [可维护性] 提取硬编码数值为命名常量
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Module-level state (equivalent to TS module-level vars)
@@ -55,7 +53,10 @@ definition: ToolDefinition = make_tool_definition(
         "action": {
             "type": "string",
             "description": "操作类型",
-            "enum": ["navigate", "click", "type", "press_key", "get_page_text", "get_elements", "wait_for", "close"],
+            "enum": [
+                "navigate", "click", "type", "press_key",
+                "get_page_text", "get_elements", "wait_for", "close",
+            ],
         },
         "url": {
             "type": "string",
@@ -100,7 +101,8 @@ async def _ensure_context() -> tuple[Any, Any]:
     """
     global _mode, _cdp_browser, _cdp_context, _persistent_ctx, _page
 
-    from playwright.async_api import async_playwright, Error as PlaywrightError
+    from playwright.async_api import Error as PlaywrightError
+    from playwright.async_api import async_playwright
 
     # Try CDP first
     if _mode == "unknown":
@@ -136,7 +138,11 @@ async def _ensure_context() -> tuple[Any, Any]:
                     "Chromium 浏览器未安装。请在终端运行：uv run playwright install chromium"
                 ) from e
             raise
-        _page = _persistent_ctx.pages[0] if _persistent_ctx.pages else await _persistent_ctx.new_page()
+        _page = (
+            _persistent_ctx.pages[0]
+            if _persistent_ctx.pages
+            else await _persistent_ctx.new_page()
+        )
 
     if _mode == "cdp":
         return _cdp_context, _page
@@ -201,7 +207,7 @@ async def _action_get_elements(selector: str) -> str:
     elements = await page.query_selector_all(selector)
 
     results = []
-    for i, el in enumerate(elements[:20]):  # Limit to 20
+    for i, el in enumerate(elements[:MAX_ELEMENTS]):
         text = await el.inner_text()
         tag = await el.evaluate("el => el.tagName")
         results.append(f"{i + 1}. <{tag}> {text[:100]}")

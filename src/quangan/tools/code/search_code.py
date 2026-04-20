@@ -6,6 +6,7 @@ Recursive code search with regex support.
 
 from __future__ import annotations
 
+import os  # Refactor: [可维护性] 修正 import 位置至文件顶部，符合 PEP 8
 import re
 from pathlib import Path
 from typing import Any
@@ -13,12 +14,18 @@ from typing import Any
 from quangan.tools.types import ToolDefinition, make_tool_definition
 
 # Directories to skip
-SKIP_DIRS = {"node_modules", "dist", ".git", ".next", "coverage", "__pycache__", ".venv", "venv", "build"}
+SKIP_DIRS = {
+    "node_modules", "dist", ".git", ".next",
+    "coverage", "__pycache__", ".venv", "venv", "build",
+}
 
 # Tool definition
 definition: ToolDefinition = make_tool_definition(
     name="search_code",
-    description="递归搜索代码文件。支持正则表达式和文件扩展名过滤。跳过 node_modules、.git、dist 等目录。",
+    description=(
+        "递归搜索代码文件。支持正则表达式和文件扩展名过滤。"
+        "跳过 node_modules、.git、dist 等目录。"
+    ),
     parameters={
         "pattern": {
             "type": "string",
@@ -132,5 +139,3 @@ def implementation(args: dict[str, Any]) -> str:
 
     return header + "\n".join(results) + footer
 
-
-import os

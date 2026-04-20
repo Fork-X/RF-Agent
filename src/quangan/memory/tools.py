@@ -173,12 +173,15 @@ def create_memory_tool_impls(client: ILLMClient, cwd: str) -> dict[str, Any]:
 
             result = await client.ask(prompt, "你是记忆整合助手，只输出纯 JSON，不加任何说明。")
 
-            # Extract JSON from response
-            json_match = re.search(r"\{[\s\S]*\}", result)
-            if not json_match:
-                return "❌ 无法解析 LLM 返回的记忆 JSON"
-
-            parsed = json.loads(json_match.group())
+            # Refactor: [设计缺陷] 精确化 JSON 提取，先尝试直接解析，失败后用精确正则
+            parsed = None
+            try:
+                parsed = json.loads(result)
+            except json.JSONDecodeError:
+                json_match = re.search(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", result)
+                if not json_match:
+                    return "❌ 无法解析 LLM 返回的记忆 JSON"
+                parsed = json.loads(json_match.group())
 
             memories = [
                 CoreMemoryItem(

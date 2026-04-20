@@ -1,4 +1,5 @@
 ---
+# Refactor: [可维护性] 统一 SKILL.md 格式，补充缺失的 tools 字段
 name: netease-music-assistant
 description: >
    网易云音乐执行层技能。由 music-player 路由调用，处理所有网易云音乐相关操作。
@@ -15,6 +16,9 @@ triggers:
   - 红心歌单
   - 偏好分析
   - 音乐推荐
+tools:
+  - run_applescript
+  - open_url
 ---
 
 # 网易云音乐助手

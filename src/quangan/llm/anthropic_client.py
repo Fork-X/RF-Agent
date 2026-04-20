@@ -14,12 +14,15 @@ Key differences from OpenAI protocol:
 
 from __future__ import annotations
 
+import asyncio
 import json
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 
 import httpx
 
 from quangan.config.llm_config import LLMConfig
+from quangan.llm._cancel_support import request_with_retry
 from quangan.llm.types import (
     AgentCallRequest,
     AgentCallResponse,
@@ -54,7 +57,7 @@ class AnthropicClient(ILLMClient):
         """
         self._config = config
         self._validate_config()
-        self._client = httpx.AsyncClient(timeout=180.0)
+        self._client = httpx.AsyncClient(timeout=float(config.timeout_seconds))
 
     def _validate_config(self) -> None:
         """Validate that required configuration fields are present."""
@@ -273,7 +276,7 @@ class AnthropicClient(ILLMClient):
             json=body,
         ) as response:
             if not response.is_success:
-                error_text = await response.aread()
+                await response.aread()
                 raise RuntimeError(f"API 调用失败: {response.status_code}")
 
             buffer = ""
@@ -333,15 +336,15 @@ class AnthropicClient(ILLMClient):
         if self._needs_thinking():
             body["thinking"] = {"type": "enabled", "budgetTokens": 16000}
 
-        response = await self._client.post(
-            f"{self._config.base_url}/messages",
-            headers=self._build_headers(),
-            json=body,
+        # Refactor: [HIGH-RISK] HTTP阻塞期间无法响应ESC中断，改用双等待模式 + 重试策略
+        headers = self._build_headers()
+        url = f"{self._config.base_url}/messages"
+        response = await request_with_retry(
+            lambda: self._client.post(url, headers=headers, json=body),
+            req.cancel_event,
+            max_retries=self._config.max_retries,
+            retry_status_codes=self._config.retry_status_codes,
         )
-
-        # Check for cancellation after request
-        if req.cancel_event and req.cancel_event.is_set():
-            raise asyncio.CancelledError("Request cancelled")
 
         if not response.is_success:
             error_text = response.text
@@ -398,6 +401,3 @@ class AnthropicClient(ILLMClient):
     async def close(self) -> None:
         """Close the HTTP client."""
         await self._client.aclose()
-
-
-import asyncio

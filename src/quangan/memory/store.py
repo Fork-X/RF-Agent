@@ -15,8 +15,10 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
-# Memory base directory (QUANGAN-py project root)
-MEMORY_BASE_DIR = Path(__file__).resolve().parents[3] / ".memory"
+from quangan.config.paths import get_memory_base_dir
+
+# Refactor: [设计缺陷] 消除硬编码路径依赖，改用统一路径解析
+MEMORY_BASE_DIR = get_memory_base_dir()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -74,25 +76,23 @@ def _extract_date_from_filename(filename: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def get_memory_dir(cwd: str) -> Path:
-    """
-    Get memory directory path, creating if needed.
+def get_memory_dir(project_root: str | None = None) -> Path:
+    """Get memory directory path, creating if needed.
+
+    Refactor: [可维护性] 参数语义从 cwd 修正为 project_root，移除嵌套保护逻辑。
 
     Args:
-        cwd: Working directory (used to determine memory location)
+        project_root: Project root directory. If None, uses auto-detected root.
 
     Returns:
-        Path to .memory directory
+        Path to .memory directory.
     """
-    dir_path = Path(cwd)
-    # 兼容调用方直接传入 .memory 目录的情况，避免重复嵌套
-    if dir_path.name != ".memory":
-        dir_path = dir_path / ".memory"
+    if project_root is None:
+        return get_memory_base_dir()
+    dir_path = Path(project_root) / ".memory"
     dir_path.mkdir(parents=True, exist_ok=True)
-
     life_dir = dir_path / "life"
     life_dir.mkdir(parents=True, exist_ok=True)
-
     return dir_path
 
 

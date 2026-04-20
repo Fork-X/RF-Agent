@@ -9,10 +9,9 @@ from __future__ import annotations
 import subprocess
 from typing import Any
 
+# Refactor: [代码重复] 使用共享黑名单，见 _shared.py
+from quangan.tools.command._shared import check_command_safety
 from quangan.tools.types import ToolDefinition, make_tool_definition
-
-# Hard blacklist
-BLOCKED = ["sudo", "shutdown", "reboot", "mkfs", ":(){ :|:& };:"]
 
 # Tool definition
 definition: ToolDefinition = make_tool_definition(
@@ -43,9 +42,9 @@ def implementation(args: dict[str, Any]) -> str:
     cmd = args["command"].strip()
 
     # Check blacklist
-    for blocked in BLOCKED:
-        if blocked in cmd:
-            return f'🚫 拒绝执行危险命令: "{blocked}"'
+    safety_error = check_command_safety(cmd)
+    if safety_error:
+        return safety_error
 
     try:
         result = subprocess.run(

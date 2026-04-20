@@ -10,6 +10,7 @@ LLM Client 可观测性包装器。
 
 from __future__ import annotations
 
+import time
 from collections.abc import AsyncGenerator
 from typing import Any
 
@@ -73,14 +74,28 @@ class LoggingClient(ILLMClient):
             raise
 
     async def agent_call(self, req: AgentCallRequest) -> AgentCallResponse:
-        """Agent 调用记录消息数与完成状态。"""
+        """Agent 调用记录消息数、耗时和 token 用量。"""
         logger.debug("LLM agent_call request: %d messages", len(req.messages))
+        start = time.time()
         try:
             result = await self._inner.agent_call(req)
-            logger.debug("LLM agent_call completed")
+            elapsed_ms = (time.time() - start) * 1000
+            usage_info = ""
+            if result.usage:
+                usage_info = (
+                    f", tokens: prompt={result.usage.prompt}"
+                    f" completion={result.usage.completion}"
+                    f" total={result.usage.total}"
+                )
+            logger.info(
+                "LLM request completed in %.0fms%s",
+                elapsed_ms,
+                usage_info,
+            )
             return result
         except Exception:
-            logger.error("LLM agent_call failed")
+            elapsed_ms = (time.time() - start) * 1000
+            logger.error("LLM agent_call failed after %.0fms", elapsed_ms)
             raise
 
     async def ask(self, question: str, system_prompt: str | None = None) -> str:

@@ -73,7 +73,7 @@ class TraceWriter:
         today = datetime.now().strftime("%Y-%m-%d")
         self._file = self._trace_dir / f"trace-{today}.jsonl"
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        self._trace_id = f"{ts}-{uuid.uuid4().hex[:4]}"
+        self._trace_id = f"{ts}-{uuid.uuid4().hex[:8]}"
         return self._trace_id
 
     def log(self, event_type: str, data: dict) -> None:

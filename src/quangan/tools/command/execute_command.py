@@ -10,21 +10,19 @@ Executes shell commands with security guards:
 
 from __future__ import annotations
 
-import asyncio
 import os
-import re
 import subprocess
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Any
 
+# Refactor: [代码重复] 使用共享黑名单，见 _shared.py
+from quangan.tools.command._shared import check_command_safety
 from quangan.tools.types import ToolDefinition, make_tool_definition
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constants
 # ─────────────────────────────────────────────────────────────────────────────
-
-# Hard blacklist: always reject these
-BLOCKED = ["sudo", "shutdown", "reboot", "mkfs", ":(){ :|:& };:"]
 
 # Dangerous operations that need path checking
 DANGEROUS_OPS = ["rm", "rmdir", "mv", "cp"]
@@ -80,7 +78,10 @@ def _is_dangerous_op(cmd: str) -> bool:
 
 definition: ToolDefinition = make_tool_definition(
     name="execute_command",
-    description="执行 shell 命令。短命令直接返回输出；启动服务等长驻进程请将 background 设为 true。",
+    description=(
+        "执行 shell 命令。短命令直接返回输出；"
+        "启动服务等长驻进程请将 background 设为 true。"
+    ),
     parameters={
         "command": {
             "type": "string",
@@ -88,7 +89,10 @@ definition: ToolDefinition = make_tool_definition(
         },
         "background": {
             "type": "boolean",
-            "description": "是否后台运行。启动服务/项目时必须设为 true，否则会因超时误判为失败。默认 false。",
+            "description": (
+                "是否后台运行。启动服务/项目时必须设为 true，"
+                "否则会因超时误判为失败。默认 false。"
+            ),
         },
     },
     required=["command"],
@@ -115,9 +119,9 @@ def create_implementation(
         background = args.get("background", False)
 
         # ── Hard blacklist check ──────────────────────────────────────
-        for blocked in BLOCKED:
-            if blocked in cmd:
-                return f'🚫 拒绝执行危险命令: "{blocked}"'
+        safety_error = check_command_safety(cmd)
+        if safety_error:
+            return safety_error
 
         # ── Path traversal check for dangerous ops ────────────────────
         if _is_dangerous_op(cmd):
@@ -186,5 +190,6 @@ def create_implementation(
     return implementation
 
 
-# Default implementation without path guard (for backward compatibility)
-implementation = create_implementation(os.getcwd())
+# Refactor: [设计缺陷] 移除依赖全局 os.getcwd() 的默认实现
+# 原 `implementation = create_implementation(os.getcwd())` 已删除
+# 所有调用方应通过 create_implementation(work_dir) 显式传入工作目录

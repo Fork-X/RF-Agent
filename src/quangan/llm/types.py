@@ -10,11 +10,11 @@ This module defines the types used for LLM communication, including:
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
-from typing import Any, AsyncGenerator, Literal, Protocol, Required, TypedDict, runtime_checkable
+from collections.abc import AsyncGenerator
+from dataclasses import dataclass
+from typing import Any, Literal, Protocol, Required, TypedDict, runtime_checkable
 
 from quangan.tools.types import ToolCall, ToolDefinition
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Message types
@@ -137,7 +137,7 @@ class ILLMClient(Protocol):
     """
 
     @property
-    def config(self) -> "LLMConfig":
+    def config(self) -> LLMConfig:
         """The configuration for this client."""
         ...
 

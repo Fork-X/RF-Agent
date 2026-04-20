@@ -8,7 +8,6 @@ For TypeScript: tsc --noEmit
 
 from __future__ import annotations
 
-import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -70,7 +69,11 @@ def implementation(args: dict[str, Any]) -> str:
 
         # Fallback: py_compile
         if target_path.is_file() and target_path.suffix == ".py":
-            tools_to_try.append(("py_compile", ["python", "-m", "py_compile", target], "Python syntax check"))
+            tools_to_try.append((
+                "py_compile",
+                ["python", "-m", "py_compile", target],
+                "Python syntax check",
+            ))
 
     elif is_ts_file or has_tsconfig or has_package_json:
         # TypeScript project
@@ -82,7 +85,11 @@ def implementation(args: dict[str, Any]) -> str:
     else:
         # Unknown project type - try Python tools as fallback
         target = str(target_path)
-        tools_to_try.append(("py_compile", ["python", "-m", "compileall", "-q", target], "Python syntax check"))
+        tools_to_try.append((
+            "py_compile",
+            ["python", "-m", "compileall", "-q", target],
+            "Python syntax check",
+        ))
 
     if not tools_to_try:
         return f"⚠️ 无法确定项目类型，跳过验证: {target_path}"
@@ -91,7 +98,7 @@ def implementation(args: dict[str, Any]) -> str:
     results: list[str] = []
     error_count = 0
 
-    for tool_name, cmd, description in tools_to_try:
+    for _tool_name, cmd, description in tools_to_try:
         try:
             result = subprocess.run(
                 cmd,
@@ -123,7 +130,7 @@ def implementation(args: dict[str, Any]) -> str:
             results.append(f"❌ {description}: {e}")
 
     if not results:
-        return f"⚠️ 未找到可用的验证工具\n建议安装: ruff (pip install ruff) 或 mypy"
+        return "⚠️ 未找到可用的验证工具\n建议安装: ruff (pip install ruff) 或 mypy"
 
     header = f"🔍 代码验证: {target_path}\n{'─' * 40}\n"
     return header + "\n\n".join(results)

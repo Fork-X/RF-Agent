@@ -1,4 +1,5 @@
 ---
+# Refactor: [可维护性] 统一 SKILL.md 格式，确认字段完整
 name: web-search
 description: 实时网络搜索助手。使用 tavily_search 获取信息，提炼总结后回复用户。
 version: 1.0.0

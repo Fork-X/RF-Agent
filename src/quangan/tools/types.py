@@ -7,9 +7,9 @@ in the OpenAI Function Calling format.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Literal, Required, TypedDict
-
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from typing import Any, Literal, Required, TypedDict
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TypedDict definitions for JSON-serializable tool structures
@@ -144,12 +144,32 @@ class ToolResult(TypedDict):
 # Type aliases
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Refactor: [可维护性] 明确异步工具的类型定义，增加文档说明
+
+ToolFunctionSync = Callable[[dict[str, Any]], str]
+"""Synchronous tool function type. Takes arguments dict, returns string result."""
+
+ToolFunctionAsync = Callable[[dict[str, Any]], Awaitable[str]]
+"""Asynchronous tool function type. Takes arguments dict, returns awaitable string result."""
+
 ToolFunction = Callable[[dict[str, Any]], Awaitable[str] | str]
 """
-Type alias for tool implementation functions.
+Unified tool function type (supports both sync and async).
 
 Tool implementations can be either sync or async functions that take
 a dictionary of arguments and return a string result.
+"""
+
+# Refactor: [可维护性] 明确 readonly 标志语义
+ToolRegistration = tuple[ToolDefinition, ToolFunction, bool]
+"""
+Tool registration 3-tuple: (definition, implementation, readonly).
+
+readonly 标志语义说明：
+- True: 工具只读取信息，不修改文件系统或外部状态
+  Plan 模式下可用（如 read_file, list_directory, search_code）
+- False: 工具可能修改文件系统或外部状态
+  Plan 模式下禁用（如 write_file, execute_command）
 """
 
 

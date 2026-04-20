@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from quangan.tools.types import ToolDefinition, make_tool_definition
+from quangan.tools.utils import normalize_path, validate_directory_exists
 
 # Tool definition
 definition: ToolDefinition = make_tool_definition(
@@ -37,13 +38,13 @@ def implementation(args: dict[str, Any]) -> str:
     Returns:
         Formatted directory listing
     """
-    dir_path = Path(args.get("dir_path", ".")).expanduser().resolve()
+    # Refactor: [代码重复] 使用共享工具函数，见 tools/utils.py
+    dir_path = normalize_path(args.get("dir_path", "."))
 
-    if not dir_path.exists():
-        return f"❌ 目录不存在: {dir_path}"
-
-    if not dir_path.is_dir():
-        return f"❌ 不是目录: {dir_path}"
+    # Refactor: [代码重复] 使用共享工具函数，见 tools/utils.py
+    error = validate_directory_exists(dir_path)
+    if error:
+        return error
 
     try:
         entries = list(dir_path.iterdir())

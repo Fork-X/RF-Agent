@@ -6,10 +6,13 @@ Find and replace text in a file.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from quangan.tools.types import ToolDefinition, make_tool_definition
+from quangan.tools.utils import normalize_path, validate_file_exists
+
+# Refactor: [可维护性] 提取硬编码数值为命名常量
+MAX_DISPLAY_LENGTH = 50
 
 # Tool definition
 definition: ToolDefinition = make_tool_definition(
@@ -52,17 +55,16 @@ def implementation(args: dict[str, Any]) -> str:
     Returns:
         Success message with changes count, or error message
     """
-    file_path = Path(args["file_path"]).expanduser().resolve()
+    # Refactor: [代码重复] 使用共享工具函数，见 tools/utils.py
+    file_path = normalize_path(args["file_path"])
     old_text = args["old_text"]
     new_text = args["new_text"]
     replace_all = args.get("replace_all", False)
 
-    # Check if file exists
-    if not file_path.exists():
-        return f"❌ 文件不存在: {file_path}"
-
-    if not file_path.is_file():
-        return f"❌ 不是文件: {file_path}"
+    # Refactor: [代码重复] 使用共享工具函数，见 tools/utils.py
+    error = validate_file_exists(file_path)
+    if error:
+        return error
 
     try:
         content = file_path.read_text(encoding="utf-8")
@@ -73,14 +75,14 @@ def implementation(args: dict[str, Any]) -> str:
     match_count = content.count(old_text)
 
     if match_count == 0:
-        return f"❌ 未找到匹配文本: {old_text[:50]}..."
+        return f"❌ 未找到匹配文本: {old_text[:MAX_DISPLAY_LENGTH]}..."
 
     if match_count > 1 and not replace_all:
         return (
             f"⚠️ 找到 {match_count} 处匹配，但 replace_all=false。\n"
             f"   如需替换所有匹配，请设置 replace_all=true。\n"
             f"   匹配位置预览:\n"
-            f"   {old_text[:50]}..."
+            f"   {old_text[:MAX_DISPLAY_LENGTH]}..."
         )
 
     # Perform replacement
@@ -97,4 +99,9 @@ def implementation(args: dict[str, Any]) -> str:
     except Exception as e:
         return f"❌ 写入文件失败: {e}"
 
-    return f"✅ 已在 {file_path} 中替换 {actual_replacements} 处\n   \"{old_text[:40]}...\" → \"{new_text[:40]}...\""
+    old_preview = old_text[:MAX_DISPLAY_LENGTH]
+    new_preview = new_text[:MAX_DISPLAY_LENGTH]
+    return (
+        f"✅ 已在 {file_path} 中替换 {actual_replacements} 处\n"
+        f'   "{old_preview}..." → "{new_preview}..."'
+    )

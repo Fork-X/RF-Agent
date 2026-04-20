@@ -1,6 +1,9 @@
 ---
+# Refactor: [可维护性] 统一 SKILL.md 格式，补充缺失的 version/priority/tools 字段
 name: ncm-cli-setup
 description: 安装和配置 ncm-cli（网易云音乐 CLI 工具）。当用户需要安装 ncm-cli、配置 API Key、安装 mpv 播放器，或排查安装问题时，使用此 skill。
+version: 1.0.0
+priority: 5
 tags:
   - daily
 triggers:
@@ -10,6 +13,8 @@ triggers:
   - 配置ncm
   - ncm配置
   - mpv安装
+tools:
+  - execute_command
 ---
 
 # ncm-cli 安装配置

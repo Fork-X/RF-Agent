@@ -6,10 +6,7 @@ Provides tools for opening apps, URLs, and running AppleScript.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
-
-from quangan.tools.types import ToolDefinition
+from quangan.tools.types import ToolRegistration
 
 from .open_app import (
     definition as open_app_def,
@@ -31,12 +28,11 @@ from .run_applescript import (
 )
 
 
-def create_system_tools() -> list[tuple[ToolDefinition, Callable[[dict[str, Any]], Any], bool]]:
-    """
-    Create all system tools.
+def create_system_tools() -> list[ToolRegistration]:
+    """Create system tool registrations for OS operations.
 
     Returns:
-        List of (definition, implementation, readonly) tuples
+        List of (definition, implementation, readonly) tuples.
     """
     return [
         (open_app_def, open_app_impl, False),
